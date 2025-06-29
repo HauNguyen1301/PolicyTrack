@@ -42,7 +42,7 @@ def apply_schema_updates():
         """)
         print("'sothe_dacbiet' table and index created.")
 
-    # Thêm các thay đổi schema khác ở đây trong tương lai
+    # Các cập nhật schema khác có thể thêm vào đây
 
     conn.commit()
     conn.close()
@@ -154,14 +154,18 @@ def get_all_sign_cf():
     return sign_cfs
 
 def add_contract(contract_data):
-    """Thêm một hợp đồng mới vào database."""
+    """Thêm một hợp đồng mới và các quy định chờ liên quan."""
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
+        # Bắt đầu transaction
+        cursor.execute("BEGIN")
+
+        # 1. Thêm hợp đồng chính
         cursor.execute("""
             INSERT INTO hopdong_baohiem (
-                soHopDong, tenCongTy, HLBH_tu, HLBH_den, coPay, sign_CF_id, created_by
-            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                soHopDong, tenCongTy, HLBH_tu, HLBH_den, coPay, sign_CF_id, created_by, mr_app
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             contract_data['soHopDong'],
             contract_data['tenCongTy'],
@@ -169,13 +173,39 @@ def add_contract(contract_data):
             contract_data['HLBH_den'],
             contract_data.get('coPay', 0.0),
             contract_data['sign_CF_id'],
-            contract_data['user_id']
+            contract_data['user_id'],
+            contract_data.get('mr_app', 'Không')  # Default to 'Không' if not provided
         ))
+        
+        # Lấy ID của hợp đồng vừa tạo
+        hopdong_id = cursor.lastrowid
+
+        # 2. Thêm các quy định thời gian chờ
+        waiting_times = contract_data.get('waiting_times', [])
+        if waiting_times:
+            for cho_id, gia_tri in waiting_times:
+                cursor.execute(
+                    "INSERT INTO hopdong_quydinh_cho (hopdong_id, cho_id, gia_tri) VALUES (?, ?, ?)",
+                    (hopdong_id, cho_id, gia_tri)
+                )
+
+        # 3. Thêm các thẻ đặc biệt
+        special_cards = contract_data.get('special_cards', [])
+        if special_cards:
+            for card in special_cards:
+                cursor.execute(
+                    "INSERT INTO sothe_dacbiet (hopdong_id, so_the, ten_NDBH, ghi_chu) VALUES (?, ?, ?, ?)",
+                    (hopdong_id, card['so_the'], card['ten_NDBH'], card['ghi_chu'])
+                )
+        
+        # Commit transaction
         conn.commit()
         return True, "Thêm hợp đồng thành công!"
     except sqlite3.IntegrityError:
+        conn.rollback()
         return False, f"Lỗi: Số hợp đồng '{contract_data['soHopDong']}' đã tồn tại."
     except Exception as e:
+        conn.rollback()
         return False, f"Đã xảy ra lỗi không xác định: {e}"
     finally:
         conn.close()
@@ -229,7 +259,7 @@ def search_contracts(company_name, contract_number, benefit_group_ids):
 
     details_query = f"""
         SELECT
-            h.id AS hopdong_id, h.soHopDong, h.tenCongTy, h.HLBH_tu, h.HLBH_den, h.coPay,
+            h.id AS hopdong_id, h.soHopDong, h.tenCongTy, h.HLBH_tu, h.HLBH_den, h.coPay, h.mr_app,
             scf.mo_ta AS signCF_mo_ta,
             tgc.loai_cho AS thoigiancho_loai,
             hqc.gia_tri AS thoigiancho_giatri,
@@ -261,7 +291,8 @@ def search_contracts(company_name, contract_number, benefit_group_ids):
                     'id': hd_id, 
                     'soHopDong': row['soHopDong'], 'tenCongTy': row['tenCongTy'],
                     'HLBH_tu': row['HLBH_tu'], 'HLBH_den': row['HLBH_den'],
-                    'coPay': row['coPay'], 'signCF': row['signCF_mo_ta']
+                    'coPay': row['coPay'], 'signCF': row['signCF_mo_ta'],
+                    'mr_app': row['mr_app']
                 },
                 'waiting_periods': set(),
                 'benefits': set(),
@@ -295,3 +326,24 @@ def search_contracts(company_name, contract_number, benefit_group_ids):
         final_results.append(data)
         
     return final_results
+
+def get_all_waiting_times():
+    """Lấy danh sách tất cả các loại thời gian chờ."""
+    conn = get_db_connection()
+    waiting_times = conn.execute("SELECT id, loai_cho, mo_ta FROM thoi_gian_cho ORDER BY id").fetchall()
+    conn.close()
+    return waiting_times
+
+def add_waiting_time(loai_cho, mo_ta):
+    """Thêm một quy định thời gian chờ mới."""
+    conn = get_db_connection()
+    try:
+        conn.execute("INSERT INTO thoi_gian_cho (loai_cho, mo_ta) VALUES (?, ?)", (loai_cho, mo_ta))
+        conn.commit()
+        return True, "Thêm mới thành công!"
+    except sqlite3.IntegrityError:
+        return False, "Lỗi: Dữ liệu có thể đã tồn tại."
+    except Exception as e:
+        return False, f"Đã xảy ra lỗi: {e}"
+    finally:
+        conn.close()

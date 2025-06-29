@@ -4,6 +4,7 @@ import database
 from .admin_features_frame import AdminFeaturesFrame
 from .add_contract_frame import AddContractFrame
 from .contract_view_panel import CheckContractPanel
+from .add_benefit_frame import AddBenefitFrame
 
 class MainApplicationFrame(ttk.Frame):
     def __init__(self, parent, controller):
@@ -60,10 +61,12 @@ class MainApplicationFrame(ttk.Frame):
 
         self.check_contract_button = ttk.Button(button_panel, text="Kiểm tra Hợp đồng", style="Main.TButton", command=lambda: self.show_content_panel('CheckContractPanel'))
         self.add_contract_button = ttk.Button(button_panel, text="Thêm Hợp đồng mới", style="Main.TButton", command=lambda: self.show_content_panel('AddContractFrame'))
+        self.add_benefit_button = ttk.Button(button_panel, text="Thêm Quyền Lợi", style="Main.TButton", command=lambda: self.show_content_panel('AddBenefitFrame'))
         self.edit_contract_button = ttk.Button(button_panel, text="Chỉnh sửa Hợp đồng", style="Main.TButton", command=lambda: self.show_content_panel("edit")) # 'edit' chưa có frame
         
         self.check_contract_button.pack(side='left', expand=True, fill='x', padx=5)
         self.add_contract_button.pack(side='left', expand=True, fill='x', padx=5)
+        self.add_benefit_button.pack(side='left', expand=True, fill='x', padx=5)
         self.edit_contract_button.pack(side='left', expand=True, fill='x', padx=5)
 
         # --- Panel chứa nội dung động ---
@@ -73,7 +76,7 @@ class MainApplicationFrame(ttk.Frame):
         self.content_panel.grid_columnconfigure(0, weight=1)
 
     def _initialize_content_frames(self):
-        for F in (AddContractFrame, CheckContractPanel):
+        for F in (AddContractFrame, CheckContractPanel, AddBenefitFrame):
             page_name = F.__name__
             frame = F(self.content_panel, self.controller)
             self.frames[page_name] = frame

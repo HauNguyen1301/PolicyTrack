@@ -109,14 +109,19 @@ class CheckContractPanel(ttk.Frame):
                 header = f"{details['tenCongTy']} - {details['soHopDong']} (HL: {hlbh_tu} -> {hlbh_den})\n"
                 self.result_text.insert(tk.END, header, "header")
 
-                # 2. Định dạng Co-pay và 3. Đổi nhãn SignCF
+                # 2. Định dạng Co-pay và SignCF
                 copay_value = details['coPay']
                 if isinstance(copay_value, (int, float)):
-                    copay_info = f"Co-pay: {int(copay_value * 100)}%"
+                    copay_info = f"Co-pay: {int(copay_value)}%"
                 else:
                     copay_info = "Co-pay: N/A"
                 
                 signcf_info = f"XN GYCTT: {details['signCF'] if details['signCF'] else 'N/A'}"
+                
+                # Thông tin cơ bản
+                subheader = f"- {copay_info} | {signcf_info}\n"
+                self.result_text.insert(tk.END, subheader, "subheader")
+                
                 # Thẻ đặc biệt
                 if special_cards:
                     self.result_text.insert(tk.END, "- Thẻ đặc biệt:\n", "subheader")
@@ -125,9 +130,6 @@ class CheckContractPanel(ttk.Frame):
                         if card['ghi_chu']:
                             card_info += f" - Ghi chú: {card['ghi_chu']}"
                         self.result_text.insert(tk.END, card_info + "\n", "special_card")
-
-                subheader = f"- {copay_info} | {signcf_info}\n"
-                self.result_text.insert(tk.END, subheader, "subheader")
                 
                 # Thời gian chờ
                 if waiting_periods:
@@ -142,6 +144,12 @@ class CheckContractPanel(ttk.Frame):
                         han_muc = f"{benefit[1]:,.0f}" if isinstance(benefit[1], (int, float)) else benefit[1]
                         mo_ta = f"({benefit[2]})" if benefit[2] else ""
                         self.result_text.insert(tk.END, f"  + {benefit[0]}: {han_muc} {mo_ta}\n", "benefit")
+                
+                # Hiển thị thông tin MR App nếu có
+                mr_app_info = details.get('mr_app', '')
+                if mr_app_info and mr_app_info != 'Không':
+                    self.result_text.insert(tk.END, "- MR App BVDirect: ", "subheader")
+                    self.result_text.insert(tk.END, f"{mr_app_info}\n", "benefit")
                 
                 # Thêm dòng phân cách giữa các hợp đồng
                 if i < len(results) - 1:
