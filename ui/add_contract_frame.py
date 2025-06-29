@@ -1,7 +1,7 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
 import database
-
+from utils.date_utils import _to_date
 class AddContractFrame(ttk.Frame):
     def __init__(self, parent, controller):
         super().__init__(parent)
@@ -41,8 +41,8 @@ class AddContractFrame(ttk.Frame):
         self.fields = {
             "soHopDong": ("Số Hợp Đồng:", ttk.Entry(top_left_panel)),
             "tenCongTy": ("Tên Công Ty:", ttk.Entry(top_left_panel)),
-            "HLBH_tu": ("Hiệu lực từ (YYYY-MM-DD):", ttk.Entry(top_left_panel)),
-            "HLBH_den": ("Hiệu lực đến (YYYY-MM-DD):", ttk.Entry(top_left_panel)),
+            "HLBH_tu": ("Hiệu lực từ (DD/MM/YYYY):", ttk.Entry(top_left_panel)),
+            "HLBH_den": ("Hiệu lực đến (DD/MM/YYYY):", ttk.Entry(top_left_panel)),
             "coPay": ("Đồng chi trả (%):", ttk.Entry(top_left_panel)),
             "sign_CF": ("Sign CF:", ttk.Combobox(top_left_panel, state="readonly"))
         }
@@ -126,13 +126,17 @@ class AddContractFrame(ttk.Frame):
             if not value:
                 messagebox.showerror("Lỗi", f"Trường '{label_text}' không được để trống.")
                 return
-            contract_data[key] = value
+            # Chuẩn hóa ngày cho hai trường HLBH_tu, HLBH_den
+            if key in ("HLBH_tu", "HLBH_den"):
+                parsed_date = _to_date(value)
+                if not parsed_date:
+                    messagebox.showerror("Lỗi", f"{label_text} không đúng định dạng dd/mm/yyyy.")
+                    return
+                contract_data[key] = parsed_date.strftime("%Y-%m-%d")
+            else:
+                contract_data[key] = value
 
-        try:
-            contract_data['coPay'] = float(contract_data['coPay'])
-        except ValueError:
-            messagebox.showerror("Lỗi", "'Đồng chi trả' phải là một con số.")
-            return
+        contract_data['coPay'] = contract_data['coPay'].strip()
 
         selected_sign_cf_text = contract_data.pop('sign_CF')
         contract_data['sign_CF_id'] = self.sign_cf_map.get(selected_sign_cf_text)
@@ -172,7 +176,16 @@ class AddContractFrame(ttk.Frame):
             ten_ndbh = ten_ndbh_entry.get().strip()
             ghi_chu = ghi_chu_entry.get().strip()
 
-            if so_the and ten_ndbh: # Chỉ thêm nếu có số thẻ và tên
+            # Bỏ qua nếu người dùng không nhập (vẫn giữ placeholder hoặc rỗng)
+            placeholders = {"Số thẻ", "Tên Người Được Bảo Hiểm", "Ghi chú"}
+            if so_the in placeholders:
+                so_the = ""
+            if ten_ndbh in placeholders:
+                ten_ndbh = ""
+            if ghi_chu in placeholders:
+                ghi_chu = ""
+
+            if so_the and ten_ndbh:  # Chỉ thêm nếu người dùng nhập ít nhất 2 trường chính
                 special_cards.append({
                     'so_the': so_the,
                     'ten_NDBH': ten_ndbh,

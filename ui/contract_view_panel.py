@@ -2,6 +2,8 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 from datetime import datetime
 import database
+from utils.date_utils import format_date
+
 
 class CheckContractPanel(ttk.Frame):
     """Panel chứa chức năng tìm kiếm và hiển thị hợp đồng."""
@@ -69,6 +71,15 @@ class CheckContractPanel(ttk.Frame):
         self.result_text.tag_configure("benefit", font=("Segoe UI", 10))
         self.result_text.tag_configure("special_card", font=("Segoe UI", 10), lmargin1=20, lmargin2=20)
         self.result_text.tag_configure("separator", font=("Segoe UI", 10), spacing3=10)
+        # Giá trị lấy từ database sẽ in nghiêng để dễ nhận diện
+        self.result_text.tag_configure("db_value", font=("Segoe UI", 10, "italic"))
+        # Giá trị Co-pay cần in đậm để nổi bật
+        self.result_text.tag_configure("db_bold", font=("Segoe UI", 10, "bold"))
+
+    def format_date(self, date_str):
+        """Chuyển đổi ngày tháng về định dạng DD/MM/YYYY."""
+        return format_date(date_str)
+
 
     def perform_search(self):
         """Thực hiện tìm kiếm và hiển thị kết quả."""
@@ -94,34 +105,17 @@ class CheckContractPanel(ttk.Frame):
             for i, contract_data in enumerate(results):
                 details = contract_data['details']
                 waiting_periods = contract_data['waiting_periods']
-                benefits = contract_data['benefits']
-                special_cards = contract_data.get('special_cards', []) # Lấy dữ liệu thẻ đặc biệt
+                benefits = contract_data.get('benefits', [])  # Sử dụng get với giá trị mặc định là list rỗng
+                special_cards = contract_data.get('special_cards', [])  # Lấy dữ liệu thẻ đặc biệt
 
-                # 1. Định dạng ngày HLBH
-                try:
-                    hlbh_tu = datetime.strptime(details['HLBH_tu'], '%Y-%m-%d').strftime('%d-%m-%Y')
-                    hlbh_den = datetime.strptime(details['HLBH_den'], '%Y-%m-%d').strftime('%d-%m-%Y')
-                except (ValueError, TypeError):
-                    hlbh_tu = details['HLBH_tu'] # Giữ nguyên nếu có lỗi
-                    hlbh_den = details['HLBH_den']
+                # Định dạng ngày tháng
+                hlbh_tu = format_date(details['HLBH_tu'])
+                hlbh_den = format_date(details['HLBH_den'])
 
                 # Dòng tiêu đề hợp đồng
                 header = f"{details['tenCongTy']} - {details['soHopDong']} (HL: {hlbh_tu} -> {hlbh_den})\n"
                 self.result_text.insert(tk.END, header, "header")
 
-                # 2. Định dạng Co-pay và SignCF
-                copay_value = details['coPay']
-                if isinstance(copay_value, (int, float)):
-                    copay_info = f"Co-pay: {int(copay_value)}%"
-                else:
-                    copay_info = "Co-pay: N/A"
-                
-                signcf_info = f"XN GYCTT: {details['signCF'] if details['signCF'] else 'N/A'}"
-                
-                # Thông tin cơ bản
-                subheader = f"- {copay_info} | {signcf_info}\n"
-                self.result_text.insert(tk.END, subheader, "subheader")
-                
                 # Thẻ đặc biệt
                 if special_cards:
                     self.result_text.insert(tk.END, "- Thẻ đặc biệt:\n", "subheader")
@@ -131,11 +125,41 @@ class CheckContractPanel(ttk.Frame):
                             card_info += f" - Ghi chú: {card['ghi_chu']}"
                         self.result_text.insert(tk.END, card_info + "\n", "special_card")
                 
+                # 2. Định dạng Co-pay và SignCF (italic chỉ giá trị phù hợp)
+                copay_value = details['coPay']
+                # Nhãn Co-pay
+                self.result_text.insert(tk.END, "- Co-pay: ", "benefit")
+                # Giá trị Co-pay in nghiêng (luôn luôn)
+                self.result_text.insert(
+                    tk.END,
+                    f"{int(copay_value)}%" if isinstance(copay_value, (int, float)) else "N/A",
+                    "db_bold"
+                )
+
+                # Nhãn XN GYCTT
+                self.result_text.insert(tk.END, " | XN GYCTT: ", "benefit")
+                signcf_val = details['signCF'] if details['signCF'] else "N/A"
+                # Điều kiện: nếu value chứa cả '&' và 'ký' thì KHÔNG in nghiêng
+                if "&" in signcf_val and "ký" in signcf_val.lower():
+                    value_tag = "benefit"
+                else:
+                    value_tag = "db_value"
+                self.result_text.insert(tk.END, signcf_val, value_tag)
+                # Xuống dòng
+                self.result_text.insert(tk.END, "\n", "benefit")
+                
                 # Thời gian chờ
                 if waiting_periods:
                     self.result_text.insert(tk.END, "- Thời gian chờ:\n", "subheader")
                     for period in waiting_periods:
                         self.result_text.insert(tk.END, f"  + {period[0]}: {period[1]}\n", "benefit")
+
+
+                # Hiển thị thông tin MR App nếu có
+                mr_app_info = details.get('mr_app', '')
+                if mr_app_info and mr_app_info != 'Không':
+                    self.result_text.insert(tk.END, "- MR App BVDirect: ", "subheader")
+                    self.result_text.insert(tk.END, f"{mr_app_info}\n", "benefit")
 
                 # Danh sách quyền lợi
                 if benefits:
@@ -145,11 +169,7 @@ class CheckContractPanel(ttk.Frame):
                         mo_ta = f"({benefit[2]})" if benefit[2] else ""
                         self.result_text.insert(tk.END, f"  + {benefit[0]}: {han_muc} {mo_ta}\n", "benefit")
                 
-                # Hiển thị thông tin MR App nếu có
-                mr_app_info = details.get('mr_app', '')
-                if mr_app_info and mr_app_info != 'Không':
-                    self.result_text.insert(tk.END, "- MR App BVDirect: ", "subheader")
-                    self.result_text.insert(tk.END, f"{mr_app_info}\n", "benefit")
+
                 
                 # Thêm dòng phân cách giữa các hợp đồng
                 if i < len(results) - 1:

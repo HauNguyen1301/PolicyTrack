@@ -27,10 +27,14 @@ class MainApplicationFrame(ttk.Frame):
         )
         style.configure("Main.TButton", font=("Segoe UI", 12, 'bold'), padding=10)
         style.map('Main.TButton', foreground=[('active', 'blue')], background=[('active', '#f0f0f0')])
-        style.configure("Accent.TButton", font=("Segoe UI", 10, 'bold'), padding=10, background='#0078D7', foreground='white')
+        style.configure("Accent.TButton", 
+                      font=("Segoe UI", 10, 'bold'), 
+                      padding=10, 
+                      background='#FF4444',  # Red background
+                      foreground='red')      # Red text
         style.map('Accent.TButton', 
-            background=[('active', '#005a9e'), ('pressed', '#004578')],
-            foreground=[('active', 'white')]
+            background=[('active', '#FF6666'), ('pressed', '#FF2222')],  # Lighter/darker red on hover/press
+            foreground=[('active', 'red'), ('pressed', 'red')]  # Keep text red on all states
         )
         style.configure("Title.TLabel", font=("Segoe UI", 16, "bold"))
 
