@@ -132,7 +132,7 @@ class CheckContractPanel(ttk.Frame):
                 # Giá trị Co-pay in nghiêng (luôn luôn)
                 self.result_text.insert(
                     tk.END,
-                    f"{int(copay_value)}%" if isinstance(copay_value, (int, float)) else "N/A",
+                    (f"{int(float(copay_value))}%" if str(copay_value).replace('.', '', 1).isdigit() else str(copay_value)) if copay_value else "N/A",
                     "db_bold"
                 )
 

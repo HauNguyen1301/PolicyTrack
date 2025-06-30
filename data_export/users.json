@@ -1,0 +1,47 @@
+[
+    {
+        "id": 1,
+        "username": "admin",
+        "full_name": "Administrator",
+        "password": "$2b$12$ayjvJ0gbZkMic0UeWhPm/u5S87anJ1hn1K0UDqg2aWOEU2ZyvnQdO",
+        "role": "Admin",
+        "isActive": 1,
+        "created_at": "2025-06-19 09:41:29"
+    },
+    {
+        "id": 2,
+        "username": "nghiale",
+        "full_name": "Le Trong Nghia",
+        "password": "$2b$12$q2hHmaKhWoF70urx8edXm.2vxgxZHm3nxHaMqADJSBASilRA2mQGi",
+        "role": "Admin",
+        "isActive": 1,
+        "created_at": "2025-06-19 14:07:51"
+    },
+    {
+        "id": 3,
+        "username": "anhlong",
+        "full_name": "le anh long",
+        "password": "$2b$12$AKzemQMLWVYGGYWBu1ig/.m.KBYjDKiVOG8aCenKLeHQ2Ew6uuYaq",
+        "role": "Viewer",
+        "isActive": 1,
+        "created_at": "2025-06-19 14:08:09"
+    },
+    {
+        "id": 4,
+        "username": "duy",
+        "full_name": "Minh Duy",
+        "password": "$2b$12$x88ePGld0ca6fQWqUP70jueBdb0FhmTr1E2vWbtCzo4ZKMd3OneDS",
+        "role": "Viewer",
+        "isActive": 1,
+        "created_at": "2025-06-19 15:38:21"
+    },
+    {
+        "id": 5,
+        "username": "thaothao",
+        "full_name": "Xuan Thao",
+        "password": "$2b$12$k8FdcLzSBKdg5h7smoaAIeRUOuslq97JKdS2ke72Y.LbwwD7rEb9i",
+        "role": "Creator",
+        "isActive": 1,
+        "created_at": "2025-06-19 15:41:53"
+    }
+]

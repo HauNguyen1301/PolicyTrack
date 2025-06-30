@@ -121,13 +121,15 @@ BEGIN
             'soHopDong', OLD.soHopDong, 'tenCongTy', OLD.tenCongTy,
             'HLBH_tu', OLD.HLBH_tu, 'HLBH_den', OLD.HLBH_den,
             'coPay', OLD.coPay, 'sign_CF_id', OLD.sign_CF_id,
-            'isActive', OLD.isActive
+            'isActive', OLD.isActive,
+            'mr_app', OLD.mr_app
         ),
         JSON_OBJECT(
             'soHopDong', NEW.soHopDong, 'tenCongTy', NEW.tenCongTy,
             'HLBH_tu', NEW.HLBH_tu, 'HLBH_den', NEW.HLBH_den,
             'coPay', NEW.coPay, 'sign_CF_id', NEW.sign_CF_id,
-            'isActive', NEW.isActive
+            'isActive', NEW.isActive,
+            'mr_app', NEW.mr_app
         )
     );
 END;
@@ -141,11 +143,13 @@ BEGIN
         OLD.id,
         JSON_OBJECT(
             'ten_quyenloi', OLD.ten_quyenloi, 'han_muc', OLD.han_muc,
-            'mo_ta', OLD.mo_ta, 'isActive', OLD.isActive
+            'mo_ta', OLD.mo_ta, 'isActive', OLD.isActive    ,
+            'nhom_id', OLD.nhom_id
         ),
         JSON_OBJECT(
             'ten_quyenloi', NEW.ten_quyenloi, 'han_muc', NEW.han_muc,
-            'mo_ta', NEW.mo_ta, 'isActive', NEW.isActive
+            'mo_ta', NEW.mo_ta, 'isActive', NEW.isActive,
+            'nhom_id', NEW.nhom_id
         )
     );
 END;

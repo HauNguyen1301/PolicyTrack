@@ -13,6 +13,7 @@ class App(tk.Tk):
         # Khởi tạo DB nếu chưa có
         database.init_db()
 
+
         self.current_user = None
         
         # Cấu hình grid của cửa sổ chính

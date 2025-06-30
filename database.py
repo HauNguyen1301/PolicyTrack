@@ -1,6 +1,7 @@
 import sqlite3
 import os
 import bcrypt
+import re
 
 DB_FILE = "policy_track.db"
 
@@ -19,33 +20,14 @@ def check_password(password, hashed_password):
     """Kiểm tra mật khẩu có khớp với hash không."""
     return bcrypt.checkpw(password.encode('utf-8'), hashed_password)
 
-def apply_schema_updates():
-    """Kiểm tra và áp dụng các thay đổi schema mới nhất mà không xóa dữ liệu."""
-    conn = get_db_connection()
-    cursor = conn.cursor()
-
-    # 1. Kiểm tra và tạo bảng sothe_dacbiet
-    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='sothe_dacbiet'")
-    if cursor.fetchone() is None:
-        print("Applying schema update: Creating 'sothe_dacbiet' table...")
-        cursor.executescript("""
-            CREATE TABLE sothe_dacbiet (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                hopdong_id INTEGER NOT NULL,
-                so_the TEXT NOT NULL,
-                ten_NDBH TEXT NOT NULL, -- ten Nguoi Duoc Bao Hiem
-                ghi_chu TEXT,
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (hopdong_id) REFERENCES hopdong_baohiem(id) ON DELETE CASCADE
-            );  
-            CREATE INDEX idx_sothe_dacbiet_hopdong_id ON sothe_dacbiet(hopdong_id);
-        """)
-        print("'sothe_dacbiet' table and index created.")
-
-    # Các cập nhật schema khác có thể thêm vào đây
-
-    conn.commit()
-    conn.close()
+def apply_schema_updates(schema_file='schema.sql'):
+    """
+    (ĐÃ VÔ HIỆU HÓA THEO YÊU CẦU)
+    Chức năng này dùng để cập nhật schema (đặc biệt là các trigger) một cách thủ công.
+    Nó không còn được gọi tự động khi khởi động ứng dụng.
+    """
+    print("INFO: Automatic schema update process is disabled as per user request.")
+    return
 
 def init_db(schema_file='schema.sql'):
     """Khởi tạo database và tạo user mặc định nếu database chưa tồn tại."""
@@ -78,8 +60,8 @@ def init_db(schema_file='schema.sql'):
         conn.close()
         print("Database created and initialized.")
 
-    # Luôn chạy kiểm tra cập nhật schema sau khi khởi tạo
-    apply_schema_updates()
+    # Cập nhật schema tự động đã bị vô hiệu hóa theo yêu cầu.
+    # Nếu cần cập nhật schema thủ công, hãy gọi hàm: database.apply_schema_updates()
 
 # --- Các hàm xác thực và quản lý người dùng ---
 
