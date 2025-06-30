@@ -1,0 +1,186 @@
+BEGIN TRANSACTION;
+CREATE TABLE IF NOT EXISTS hopdong_baohiem (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    soHopDong TEXT NOT NULL UNIQUE,
+    tenCongTy TEXT NOT NULL,
+    HLBH_tu DATE NOT NULL,
+    HLBH_den DATE NOT NULL,
+    coPay TEXT NOT NULL DEFAULT 0.0,
+    sign_CF_id INTEGER,
+    isActive INTEGER DEFAULT 1,
+    created_by INTEGER,
+    mr_app TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (sign_CF_id) REFERENCES sign_CF(id),
+    FOREIGN KEY (created_by) REFERENCES users(id)
+);
+CREATE TABLE IF NOT EXISTS hopdong_baohiem_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    hopdong_id INTEGER NOT NULL,
+    updated_by INTEGER,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    old_data TEXT, -- JSON string
+    new_data TEXT, -- JSON string
+    FOREIGN KEY (hopdong_id) REFERENCES hopdong_baohiem(id) ON DELETE CASCADE,
+    FOREIGN KEY (updated_by) REFERENCES users(id)
+);
+CREATE TABLE IF NOT EXISTS hopdong_quydinh_cho (
+    hopdong_id INTEGER NOT NULL,
+    cho_id INTEGER NOT NULL,
+    gia_tri TEXT,
+    ghi_chu TEXT,
+    PRIMARY KEY (hopdong_id, cho_id),
+    FOREIGN KEY (hopdong_id) REFERENCES hopdong_baohiem(id) ON DELETE CASCADE,
+    FOREIGN KEY (cho_id) REFERENCES thoi_gian_cho(id)
+);
+CREATE TABLE IF NOT EXISTS nhom_quyenloi (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ten_nhom TEXT NOT NULL UNIQUE,
+    mo_ta TEXT
+);
+CREATE TABLE IF NOT EXISTS quyenloi_chitiet (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    hopdong_id INTEGER NOT NULL,
+    nhom_id INTEGER,
+    ten_quyenloi TEXT NOT NULL,
+    han_muc REAL DEFAULT 0.0,
+    mo_ta TEXT,
+    isActive INTEGER DEFAULT 1,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (hopdong_id) REFERENCES hopdong_baohiem(id) ON DELETE CASCADE,
+    FOREIGN KEY (nhom_id) REFERENCES nhom_quyenloi(id)
+);
+CREATE TABLE IF NOT EXISTS quyenloi_chitiet_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    quyenloi_id INTEGER NOT NULL,
+    updated_by INTEGER,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    old_data TEXT, -- JSON string
+    new_data TEXT, -- JSON string
+    FOREIGN KEY (quyenloi_id) REFERENCES quyenloi_chitiet(id) ON DELETE CASCADE,
+    FOREIGN KEY (updated_by) REFERENCES users(id)
+);
+CREATE TABLE IF NOT EXISTS sign_CF (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    mo_ta TEXT NOT NULL UNIQUE
+);
+CREATE TABLE IF NOT EXISTS sothe_dacbiet (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    hopdong_id INTEGER NOT NULL,
+    so_the TEXT NOT NULL,
+    ten_NDBH TEXT NOT NULL, -- ten Nguoi Duoc Bao Hiem
+    ghi_chu TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (hopdong_id) REFERENCES hopdong_baohiem(id) ON DELETE CASCADE
+);
+CREATE TABLE IF NOT EXISTS thoi_gian_cho (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    loai_cho TEXT NOT NULL UNIQUE,
+    mo_ta TEXT
+);
+CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT NOT NULL UNIQUE,
+    full_name TEXT NOT NULL,
+    password VARCHAR(255) NOT NULL,
+    role TEXT,
+    isActive INTEGER NOT NULL DEFAULT 1,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+INSERT INTO "hopdong_baohiem" ("id","soHopDong","tenCongTy","HLBH_tu","HLBH_den","coPay","sign_CF_id","isActive","created_by","mr_app","created_at","updated_at") VALUES (1,'HCM.D07.BVC.25.HD13','Công ty TNHH SANOFI','2025-01-01','2025-12-31','0.0',1,1,1,NULL,'2025-06-19 13:32:16','2025-06-19 13:32:16'),
+ (2,'HD99','HauNguyen','2025/01/01','2025/12/31','20.0',1,1,1,NULL,'2025-06-29 03:19:10','2025-06-29 03:19:10'),
+ (3,'HD98','Hau98','2025/01/01','2025/12/31','10.0',2,1,1,NULL,'2025-06-29 03:22:07','2025-06-29 03:22:07'),
+ (4,'97','Hau97','2025/01/01','2025/31/12','30.0',3,1,1,NULL,'2025-06-29 03:28:28','2025-06-29 03:28:28'),
+ (5,'HD96','Hau96','2025/01/01','2022/12/31','50.0',3,1,1,NULL,'2025-06-29 03:33:57','2025-06-29 03:33:57'),
+ (6,'HD95','Hau95','2025/01/01','2025/12/31','25.0',2,1,1,NULL,'2025-06-29 03:42:49','2025-06-29 03:42:49'),
+ (7,'HD94','Hau94','2025/01/01','2025/12/31','0.0',1,1,1,'Có - 10tr toàn bộ HS','2025-06-29 08:42:42','2025-06-29 08:42:42'),
+ (8,'HD11','Lego','2025-06-01','2025-12-31','0.0',5,1,1,'Có','2025-06-29 14:56:40','2025-06-29 14:56:40'),
+ (9,'123','123','2025-01-01','2025-01-01','123123',3,1,1,'Không - Không','2025-06-30 02:32:38','2025-06-30 02:32:38'),
+ (10,'APPLE','HD2','2025-01-01','2025-12-31','0',2,1,1,'Không - Không','2025-06-30 02:47:40','2025-06-30 02:47:40'),
+ (11,'HD15','Android','2025-01-01','2025-12-31','0%',5,1,1,'Có - 10tr','2025-06-30 03:14:01','2025-06-30 03:14:01');
+INSERT INTO "hopdong_quydinh_cho" ("hopdong_id","cho_id","gia_tri","ghi_chu") VALUES (10,1,'',NULL),
+ (11,1,'',NULL);
+INSERT INTO "nhom_quyenloi" ("id","ten_nhom","mo_ta") VALUES (1,'OP','Ngoại trú'),
+ (2,'OP_MR','Điểm mở rộng liên quan ngoại trú'),
+ (3,'IP','Nội trú'),
+ (4,'IP_MR','Điểm mở rộng liên quan nội trú'),
+ (5,'Accident','Tai nạn'),
+ (6,'Accident_MR','Điểm mở rộng liên quan tai nạn');
+INSERT INTO "quyenloi_chitiet" ("id","hopdong_id","nhom_id","ten_quyenloi","han_muc","mo_ta","isActive","created_at") VALUES (1,4,1,'1',1.0,'1',1,'2025-06-30 02:46:37'),
+ (2,11,1,'Ngoại trú','2.000.000đ / lần khám','KGHSK',1,'2025-06-30 03:14:38'),
+ (3,11,1,'Răng','1.000.000đ / lần','CVR 500k; PT 500k',1,'2025-06-30 03:14:51');
+INSERT INTO "sign_CF" ("id","mo_ta") VALUES (1,'Bản cứng'),
+ (2,'Bản mềm'),
+ (3,'Không yêu cầu'),
+ (5,'Dữ liệu bị thiếu (ID: 5)');
+INSERT INTO "sothe_dacbiet" ("id","hopdong_id","so_the","ten_NDBH","ghi_chu","created_at") VALUES (1,11,'HD15.1','Nguyễn văn A','Không ung thư','2025-06-30 03:14:01');
+INSERT INTO "thoi_gian_cho" ("id","loai_cho","mo_ta") VALUES (1,'Bỏ chờ toàn bộ','Không áp dụng thời gian chờ cho bất kỳ quyền lợi nào'),
+ (2,'Chờ bệnh thông thường','Thời gian chờ tiêu chuẩn cho các bệnh thông thường, thường là 30 ngày'),
+ (3,'Chờ bệnh có sẵn','Thời gian chờ cho các bệnh/thương tật đã có từ trước khi tham gia bảo hiểm'),
+ (4,'Chờ bệnh đặc biệt','Thời gian chờ cho các bệnh được liệt kê trong danh sách bệnh đặc biệt'),
+ (5,'Chờ thai sản / biến chứng','Thời gian chờ cho quyền lợi thai sản và các biến chứng liên quan'),
+ (6,'Prorata thai sản / biến chứng','Quyền lợi thai sản được tính theo tỷ lệ thời gian tham gia thực tế'),
+ (7,'Chờ tử vong','Thời gian chờ cho quyền lợi tử vong do bệnh tật');
+INSERT INTO "users" ("id","username","full_name","password","role","isActive","created_at") VALUES (1,'admin','Administrator',X'2432622431322461796a764a3067625a6b4d69633055655768506d2f7535533837616e4a31686e314b30554471673261574f4555325a79766e51644f','Admin',1,'2025-06-19 09:41:29'),
+ (2,'nghiale','Le Trong Nghia',X'24326224313224713268486d614b68576f463730757278386564586d2e32767867785a486d336e7848614d7141444a53424153696c5241326d514769','Admin',1,'2025-06-19 14:07:51'),
+ (3,'anhlong','le anh long',X'24326224313224414b7a656d514d4c5756594747595742753169672f2e6d2e4b42596a444b69564f47386143656e4b4c654851324577367575596171','Viewer',1,'2025-06-19 14:08:09'),
+ (4,'duy','Minh Duy',X'243262243132247838386550476c643063613666515771555037306a75654264623046686d547231453276576274437a6f345a4b4d64334f6e654453','Viewer',1,'2025-06-19 15:38:21'),
+ (5,'thaothao','Xuan Thao',X'243262243132246b384664634c7a53424b6467356837736d6f6141496552554f75736c7139374a4b6453326b653732592e4c62777744377245623969','Creator',1,'2025-06-19 15:41:53');
+CREATE INDEX idx_hopdong_history_id ON hopdong_baohiem_history(hopdong_id);
+CREATE INDEX idx_hopdong_soHopDong ON hopdong_baohiem(soHopDong);
+CREATE INDEX idx_quyenloi_history_id ON quyenloi_chitiet_history(quyenloi_id);
+CREATE INDEX idx_quyenloi_hopdong_id ON quyenloi_chitiet(hopdong_id);
+CREATE INDEX idx_sothe_dacbiet_hopdong_id ON sothe_dacbiet(hopdong_id);
+CREATE TRIGGER log_hopdong_baohiem_update
+AFTER UPDATE ON hopdong_baohiem
+FOR EACH ROW
+BEGIN
+    INSERT INTO hopdong_baohiem_history (hopdong_id, updated_by, old_data, new_data)
+    VALUES (
+        OLD.id,
+        NEW.created_by, -- Giả sử user ID được truyền vào khi cập nhật
+        JSON_OBJECT(
+            'soHopDong', OLD.soHopDong, 'tenCongTy', OLD.tenCongTy,
+            'HLBH_tu', OLD.HLBH_tu, 'HLBH_den', OLD.HLBH_den,
+            'coPay', OLD.coPay, 'sign_CF_id', OLD.sign_CF_id,
+            'isActive', OLD.isActive,
+            'mr_app', OLD.mr_app
+        ),
+        JSON_OBJECT(
+            'soHopDong', NEW.soHopDong, 'tenCongTy', NEW.tenCongTy,
+            'HLBH_tu', NEW.HLBH_tu, 'HLBH_den', NEW.HLBH_den,
+            'coPay', NEW.coPay, 'sign_CF_id', NEW.sign_CF_id,
+            'isActive', NEW.isActive,
+            'mr_app', NEW.mr_app
+        )
+    );
+END;
+CREATE TRIGGER log_quyenloi_chitiet_update
+AFTER UPDATE ON quyenloi_chitiet
+FOR EACH ROW
+BEGIN
+    INSERT INTO quyenloi_chitiet_history (quyenloi_id, old_data, new_data)
+    VALUES (
+        OLD.id,
+        JSON_OBJECT(
+            'ten_quyenloi', OLD.ten_quyenloi, 'han_muc', OLD.han_muc,
+            'mo_ta', OLD.mo_ta, 'isActive', OLD.isActive    ,
+            'nhom_id', OLD.nhom_id
+        ),
+        JSON_OBJECT(
+            'ten_quyenloi', NEW.ten_quyenloi, 'han_muc', NEW.han_muc,
+            'mo_ta', NEW.mo_ta, 'isActive', NEW.isActive,
+            'nhom_id', NEW.nhom_id
+        )
+    );
+END;
+CREATE TRIGGER update_hopdong_baohiem_updated_at
+AFTER UPDATE ON hopdong_baohiem
+FOR EACH ROW
+BEGIN
+    UPDATE hopdong_baohiem
+    SET updated_at = CURRENT_TIMESTAMP
+    WHERE id = OLD.id;
+END;
+COMMIT;

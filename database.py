@@ -1,16 +1,35 @@
-import sqlite3
 import os
+from typing import Any, Dict, List, Tuple
 import bcrypt
 import re
+from dotenv import load_dotenv
+import libsql_client
 
-DB_FILE = "policy_track.db"
+# --- Load Environment Variables for Turso ---
+load_dotenv()
+TURSO_DATABASE_URL = os.getenv("TURSO_DATABASE_URL")
+TURSO_AUTH_TOKEN = os.getenv("TURSO_AUTH_TOKEN")
+# --- Turso Connection Helper ---
+def get_db_connection() -> libsql_client.Client:
+    """Return a synchronous Turso client using HTTPS."""
+    if not TURSO_DATABASE_URL or not TURSO_AUTH_TOKEN:
+        raise RuntimeError("Missing Turso environment variables")
+    http_url = TURSO_DATABASE_URL.replace("libsql", "https", 1)
+    return libsql_client.create_client_sync(url=http_url, auth_token=TURSO_AUTH_TOKEN)
 
-def get_db_connection():
-    """Tạo kết nối đến database."""
-    conn = sqlite3.connect(DB_FILE)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA foreign_keys = ON")
-    return conn
+
+# --- Helper to convert Turso rows to dictionaries ---
+def _to_dicts(rs: libsql_client.ResultSet) -> List[Dict[str, Any]]:
+    """Converts an ExecuteResult to a list of dictionaries, decoding bytes to UTF-8 strings."""
+    if not rs.rows:
+        return []
+    columns = rs.columns
+    
+    def process_row(row):
+        values = [v.decode('utf-8') if isinstance(v, bytes) else v for v in row]
+        return dict(zip(columns, values))
+        
+    return [process_row(row) for row in rs.rows]
 
 def hash_password(password):
     """Mã hóa mật khẩu."""
@@ -30,302 +49,418 @@ def apply_schema_updates(schema_file='schema.sql'):
     return
 
 def init_db(schema_file='schema.sql'):
-    """Khởi tạo database và tạo user mặc định nếu database chưa tồn tại."""
-    db_exists = os.path.exists(DB_FILE)
-    # Nếu file DB chưa tồn tại, tạo mới và thêm dữ liệu ban đầu
-    if not db_exists:
-        print("Creating database...")
-        conn = get_db_connection()
+    """Initializes the database by creating tables and a default admin user if they don't exist."""
+    client = get_db_connection()
+    try:
+        # Check if the 'users' table exists as a proxy for DB initialization
+        rs = client.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='users'")
+        if len(rs.rows) > 0:
+            print("Database already initialized.")
+            return
+
+        print("Database not initialized. Creating schema and default users...")
+
+        # Read and execute schema file
         with open(schema_file, 'r', encoding='utf-8') as f:
-            conn.executescript(f.read())
+            # Split SQL script into individual statements
+            sql_script = f.read()
+            statements = [s.strip() for s in sql_script.split(';') if s.strip()]
+            
+            # Execute each statement individually as transactions are not supported over HTTP
+            for statement in statements:
+                client.execute(statement)
 
-        # Thêm dữ liệu mẫu
+        # Add default users
         hashed_password_admin = hash_password('admin')
-        hashed_password_user = hash_password('123456')
-
-        conn.execute("INSERT INTO users (username, full_name, password, role) VALUES (?, ?, ?, ?)", 
-                     ('admin', 'Admin User', hashed_password_admin, 'admin'))
-        conn.execute("INSERT INTO users (username, full_name, password, role) VALUES (?, ?, ?, ?)", 
-                     ('creator', 'Creator User', hashed_password_user, 'creator'))
-        conn.execute("INSERT INTO users (username, full_name, password, role) VALUES (?, ?, ?, ?)", 
-                     ('viewer', 'Viewer User', hashed_password_user, 'viewer'))
-
-        conn.execute("INSERT INTO sign_CF (mo_ta) VALUES (?), (?), (?)", 
-                     ('Bản cứng', 'Bản mềm', 'Không yêu cầu'))
-
-        conn.execute("INSERT INTO nhom_quyenloi (ten_nhom) VALUES (?), (?), (?), (?)", 
-                     ('Nội trú', 'Ngoại trú', 'Thai sản', 'Nha khoa'))
+        client.execute(
+            "INSERT INTO users (username, password, full_name, role) VALUES (?, ?, ?, ?)",
+            ['admin', hashed_password_admin, 'Administrator', 'admin']
+        )
         
-        conn.commit()
-        conn.close()
-        print("Database created and initialized.")
+        hashed_password_user = hash_password('user')
+        client.execute(
+            "INSERT INTO users (username, password, full_name, role) VALUES (?, ?, ?, ?)",
+            ['user', hashed_password_user, 'Normal User', 'user']
+        )
+        
+        print("Database initialized successfully.")
 
-    # Cập nhật schema tự động đã bị vô hiệu hóa theo yêu cầu.
-    # Nếu cần cập nhật schema thủ công, hãy gọi hàm: database.apply_schema_updates()
+    except Exception as e:
+        print(f"An error occurred during DB initialization: {e}")
+    finally:
+        client.close()
+
 
 # --- Các hàm xác thực và quản lý người dùng ---
 
 def verify_user(username, password):
-    """Xac thuc nguoi dung."""
-    conn = get_db_connection()
-    user = conn.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
-    conn.close()
-    if user and check_password(password, user['password']):
-        return user
+    """Verifies user credentials against the database."""
+    client = get_db_connection()
+    try:
+        rs = client.execute("SELECT * FROM users WHERE username = ?", [username])
+        
+        if not rs.rows:
+            return None
+            
+        # Manually build the user dict to preserve password as bytes
+        user_row = rs.rows[0]
+        columns = rs.columns
+        user_dict = {}
+        hashed_password = None
+
+        for idx, col_name in enumerate(columns):
+            value = user_row[idx]
+            if col_name == 'password':
+                hashed_password = value # Keep as bytes
+                user_dict[col_name] = value
+            else:
+                # Decode other byte strings to text
+                user_dict[col_name] = value.decode('utf-8') if isinstance(value, bytes) else value
+
+        if hashed_password and check_password(password, hashed_password):
+            # Do not return the password hash to the application
+            del user_dict['password']
+            return user_dict
+            
+    except Exception as e:
+        print(f"Error during user verification: {e}")
+    finally:
+        client.close()
+        
     return None
 
 def update_password(username, new_password):
-    """Cập nhật mật khẩu cho người dùng / admin"""
-    new_hashed_password = hash_password(new_password)
-    conn = get_db_connection()
-    conn.execute("UPDATE users SET password = ? WHERE username = ?", (new_hashed_password, username))
-    conn.commit()
-    conn.close()
+    """Updates the password for a given user."""
+    client = get_db_connection()
+    try:
+        hashed_password = hash_password(new_password)
+        client.execute(
+            "UPDATE users SET password = ? WHERE username = ?",
+            [hashed_password, username]
+        )
+    except Exception as e:
+        print(f"Error updating password: {e}")
+    finally:
+        client.close()
 
 def update_user_role(username, new_role):
-    """Cập nhật vai trò cho người dùng. / admin """
-    conn = get_db_connection()
-    conn.execute("UPDATE users SET role = ? WHERE username = ?", (new_role, username))
-    conn.commit()
-    conn.close()
+    """Updates the role for a given user."""
+    client = get_db_connection()
+    try:
+        client.execute(
+            "UPDATE users SET role = ? WHERE username = ?",
+            [new_role, username]
+        )
+    except Exception as e:
+        print(f"Error updating user role: {e}")
+    finally:
+        client.close()
 
-def create_user(username, password, full_name, role):
-    """Tạo một user mới."""
+def create_user(username, password, full_name, role) -> Tuple[bool, str]:
+    """
+    Tạo một người dùng mới trong cơ sở dữ liệu.
+    Kiểm tra xem người dùng đã tồn tại chưa trước khi tạo.
+    Trả về:
+        Tuple[bool, str]: (True, "Thông báo thành công") hoặc (False, "Thông báo lỗi").
+    """
     conn = get_db_connection()
     try:
-        hashed_pw = hash_password(password)
+        # Kiểm tra xem username đã tồn tại chưa
+        rs = conn.execute("SELECT username FROM users WHERE username = ?", [username])
+        if len(rs.rows) > 0:
+            return (False, f"Tên đăng nhập '{username}' đã tồn tại.")
+
+        hashed_password = hash_password(password)
         conn.execute(
             "INSERT INTO users (username, password, full_name, role) VALUES (?, ?, ?, ?)",
-            (username, hashed_pw, full_name, role)
+            [username, hashed_password, full_name, role]
         )
-        conn.commit()
-        return True, "Tạo user thành công!"
-    except sqlite3.IntegrityError:
-        return False, f"Username '{username}' đã tồn tại."
+        return (True, f"Người dùng '{username}' đã được tạo thành công!")
+    except Exception as e:
+        return (False, f"Đã xảy ra lỗi khi tạo người dùng: {e}")
     finally:
         conn.close()
 
-
 def get_all_users():
-    """Lấy danh sách tất cả người dùng."""
-    conn = get_db_connection()
-    # Lấy các cột cần thiết, không lấy password
-    users = conn.execute("SELECT id, username, full_name, role FROM users ORDER BY username").fetchall()
-    conn.close()
-    return users
+    """Retrieves a list of all users (without passwords)."""
+    client = get_db_connection()
+    try:
+        rs = client.execute("SELECT id, username, full_name, role FROM users ORDER BY username")
+        return _to_dicts(rs)
+    except Exception as e:
+        print(f"Error getting all users: {e}")
+        return []
+    finally:
+        client.close()
 
 def search_users(search_term):
-    """Tìm kiếm người dùng theo username hoặc full_name."""
-    conn = get_db_connection()
-    like_term = f"%{search_term}%"
-    users = conn.execute(
-        "SELECT id, username, full_name, role FROM users WHERE username LIKE ? OR full_name LIKE ? ORDER BY username",
-        (like_term, like_term)
-    ).fetchall()
-    conn.close()
-    return users
+    """Searches for users by username or full name."""
+    client = get_db_connection()
+    try:
+        like_term = f'%{search_term}%'
+        rs = client.execute(
+            "SELECT id, username, full_name, role FROM users WHERE username LIKE ? OR full_name LIKE ?",
+            [like_term, like_term]
+        )
+        return _to_dicts(rs)
+    except Exception as e:
+        print(f"Error searching users: {e}")
+        return []
+    finally:
+        client.close()
+
 
 # --- Các hàm CRUD cho Hợp đồng ---
 
 def get_all_sign_cf():
-    """Lấy danh sách tất cả các tùy chọn Sign CF."""
-    conn = get_db_connection()
-    # Lấy id và mo_ta để sử dụng cho combobox
-    sign_cfs = conn.execute("SELECT id, mo_ta FROM sign_CF ORDER BY id").fetchall()
-    conn.close()
-    return sign_cfs
+    """Retrieves all Sign CF options."""
+    client = get_db_connection()
+    try:
+        rs = client.execute("SELECT id, mo_ta FROM sign_CF ORDER BY id")
+        return _to_dicts(rs)
+    except Exception as e:
+        print(f"Error getting sign cf options: {e}")
+        return []
+    finally:
+        client.close()
 
 def add_contract(contract_data):
-    """Thêm một hợp đồng mới và các quy định chờ liên quan."""
-    conn = get_db_connection()
+    """Adds a new contract and its related details sequentially."""
+    client = get_db_connection()
     try:
-        cursor = conn.cursor()
-        # Bắt đầu transaction
-        cursor.execute("BEGIN")
-
-        # 1. Thêm hợp đồng chính
-        cursor.execute("""
+        # Step 1: Insert the main contract details
+        rs = client.execute(
+            """
             INSERT INTO hopdong_baohiem (
-                soHopDong, tenCongTy, HLBH_tu, HLBH_den, coPay, sign_CF_id, created_by, mr_app
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
-            contract_data['soHopDong'],
-            contract_data['tenCongTy'],
-            contract_data['HLBH_tu'],
-            contract_data['HLBH_den'],
-            contract_data.get('coPay', 0.0),
-            contract_data['sign_CF_id'],
-            contract_data['user_id'],
-            contract_data.get('mr_app', 'Không')  # Default to 'Không' if not provided
-        ))
-        
-        # Lấy ID của hợp đồng vừa tạo
-        hopdong_id = cursor.lastrowid
+                soHopDong, tenCongTy, HLBH_tu, HLBH_den, coPay, sign_CF_id, mr_app
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            [
+                contract_data['soHopDong'],
+                contract_data['tenCongTy'],
+                contract_data['HLBH_tu'],
+                contract_data['HLBH_den'],
+                contract_data['coPay'],
+                contract_data['sign_CF_id'],
+                contract_data['mr_app']
+            ]
+        )
+        contract_id = rs.last_insert_rowid
 
-        # 2. Thêm các quy định thời gian chờ
-        waiting_times = contract_data.get('waiting_times', [])
-        if waiting_times:
-            for cho_id, gia_tri in waiting_times:
-                cursor.execute(
-                    "INSERT INTO hopdong_quydinh_cho (hopdong_id, cho_id, gia_tri) VALUES (?, ?, ?)",
-                    (hopdong_id, cho_id, gia_tri)
-                )
+        if not contract_id:
+            raise Exception("Failed to retrieve the new contract ID after insertion.")
 
-        # 3. Thêm các thẻ đặc biệt
-        special_cards = contract_data.get('special_cards', [])
-        if special_cards:
-            for card in special_cards:
-                cursor.execute(
-                    "INSERT INTO sothe_dacbiet (hopdong_id, so_the, ten_NDBH, ghi_chu) VALUES (?, ?, ?, ?)",
-                    (hopdong_id, card['so_the'], card['ten_NDBH'], card['ghi_chu'])
-                )
+        # Step 2: Insert waiting periods
+        for waiting_period in contract_data.get('waiting_periods', []):
+            client.execute(
+                "INSERT INTO hopdong_quydinh_cho (hopdong_id, cho_id, gia_tri) VALUES (?, ?, ?)",
+                [contract_id, waiting_period['id'], waiting_period['value']]
+            )
+
+        # Step 3: Insert benefit details
+        for benefit in contract_data.get('benefits', []):
+            client.execute(
+                """
+                INSERT INTO quyenloi_chitiet (hopdong_id, nhom_id, ten_quyenloi, han_muc, mo_ta) 
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                [
+                    contract_id,
+                    benefit['group_id'],
+                    benefit['name'],
+                    benefit['limit'],
+                    benefit['description']
+                ]
+            )
+
+        # Step 4: Insert special cards
+        for card in contract_data.get('special_cards', []):
+            client.execute(
+                "INSERT INTO sothe_dacbiet (hopdong_id, so_the, ten_NDBH, ghi_chu) VALUES (?, ?, ?, ?)",
+                [contract_id, card['number'], card['holder_name'], card['notes']]
+            )
         
-        # Commit transaction
-        conn.commit()
         return True, "Thêm hợp đồng thành công!"
-    except sqlite3.IntegrityError:
-        conn.rollback()
-        return False, f"Lỗi: Số hợp đồng '{contract_data['soHopDong']}' đã tồn tại."
+
     except Exception as e:
-        conn.rollback()
-        return False, f"Đã xảy ra lỗi không xác định: {e}"
+        print(f"Failed to add contract: {e}")
+        # NOTE: Cannot roll back changes due to lack of transaction support.
+        return False, f"Lỗi khi thêm hợp đồng: {e}"
     finally:
-        conn.close()
+        client.close()
 
 def get_all_benefit_groups():
-    """Lấy danh sách tất cả các nhóm quyền lợi."""
-    conn = get_db_connection()
-    # Lấy id và ten_nhom để sử dụng cho việc lọc
-    groups = conn.execute("SELECT id, ten_nhom FROM nhom_quyenloi ORDER BY id").fetchall()
-    conn.close()
-    return groups
+    """Retrieves all benefit group options."""
+    client = get_db_connection()
+    try:
+        rs = client.execute("SELECT id, ten_nhom FROM nhom_quyenloi ORDER BY id")
+        return _to_dicts(rs)
+    except Exception as e:
+        print(f"Error getting benefit groups: {e}")
+        return []
+    finally:
+        client.close()
 
-def search_contracts(company_name, contract_number, benefit_group_ids):
+def search_contracts(company_name='', contract_number='', benefit_group_ids=None):
+    if benefit_group_ids is None:
+        benefit_group_ids = []
     """
-    Tìm kiếm hợp đồng, trả về dữ liệu được nhóm theo từng hợp đồng, bao gồm cả thẻ đặc biệt.
+    Searches for contracts using a per-operation connection and positional parameters for robustness.
     """
-    conn = get_db_connection()
-    cursor = conn.cursor()
+    conn = get_db_connection() # Create a fresh connection for this operation
+    try:
+        base_query = """
+            SELECT DISTINCT hdb.id, hdb.tenCongTy, hdb.soHopDong, hdb.HLBH_tu, hdb.HLBH_den,
+                            hdb.coPay, COALESCE(sc.mo_ta, '') AS signCF, hdb.mr_app
+            FROM hopdong_baohiem hdb
+            LEFT JOIN sign_CF sc ON hdb.sign_CF_id = sc.id
+        """
+        conditions = []
+        params = [] # Use a list for positional parameters
 
-    # --- Bước 1: Lọc và lấy ID các hợp đồng thỏa mãn điều kiện ---
-    filter_query = "SELECT DISTINCT h.id FROM hopdong_baohiem h"
-    filter_params = []
-    where_clauses = ["h.isActive = 1"]
+        if company_name:
+            conditions.append("tenCongTy LIKE ?")
+            params.append(f"%{company_name}%")
 
-    if benefit_group_ids:
-        filter_query += " JOIN quyenloi_chitiet q ON h.id = q.hopdong_id"
-        placeholders = ','.join('?' for _ in benefit_group_ids)
-        where_clauses.append(f"q.nhom_id IN ({placeholders})")
-        filter_params.extend(benefit_group_ids)
+        if contract_number:
+            conditions.append("soHopDong LIKE ?")
+            params.append(f"%{contract_number}%")
 
-    if company_name:
-        where_clauses.append("h.tenCongTy LIKE ?")
-        filter_params.append(f"%{company_name}%")
+        if conditions:
+            base_query += " WHERE " + " AND ".join(conditions)
 
-    if contract_number:
-        where_clauses.append("h.soHopDong LIKE ?")
-        filter_params.append(f"%{contract_number}%")
+        # Execute the primary search query
+        rs = conn.execute(base_query, params)
+        all_matching_contracts = _to_dicts(rs)
 
-    if len(where_clauses) > 1:
-        filter_query += " WHERE " + " AND ".join(where_clauses)
+        if not all_matching_contracts:
+            return []
 
-    matching_ids = [row['id'] for row in cursor.execute(filter_query, filter_params).fetchall()]
+        # If benefit groups are selected, filter the results
+        if benefit_group_ids:
+            ids_placeholder = ', '.join(['?'] * len(benefit_group_ids))
+            # Note: Table and column names in this query must match your actual schema
+            filter_query = f"""
+                SELECT DISTINCT hopdong_id FROM quyenloi_chitiet WHERE nhom_id IN ({ids_placeholder})
+            """
+            filter_rs = conn.execute(filter_query, benefit_group_ids)
+            valid_contract_ids = {row[0] for row in filter_rs.rows}
+            
+            contracts_to_process = [c for c in all_matching_contracts if c['id'] in valid_contract_ids]
+        else:
+            contracts_to_process = all_matching_contracts
 
-    if not matching_ids:
-        conn.close()
+        # Fetch details for the final list of contracts
+        results = []
+        for contract_details in contracts_to_process:
+            contract_id = contract_details['id']
+            contract_data = {
+                "details": contract_details,
+                # Pass the active connection to helper functions
+                "waiting_periods": get_waiting_periods_for_contract(conn, contract_id),
+                "benefits": get_benefits_for_contract(conn, contract_id),
+                "special_cards": get_special_cards_for_contract(conn, contract_id)
+            }
+            results.append(contract_data)
+        return results
+
+    except Exception as e:
+        print(f"An error occurred during contract search: {e}")
+        import traceback
+        traceback.print_exc()
+        return []
+    finally:
+        if conn:
+            conn.close() # Ensure the connection is closed
+
+# --- Helper functions for contract details (using the passed connection) ---
+
+def get_waiting_periods_for_contract(conn, contract_id):
+    """Trả về list[(loai_cho, gia_tri)] để UI hiển thị 'loai_cho: gia_tri'."""
+    query = """
+        SELECT tgc.loai_cho, tgc.mo_ta
+        FROM hopdong_quydinh_cho hqc
+        JOIN thoi_gian_cho tgc ON hqc.cho_id = tgc.id
+        WHERE hqc.hopdong_id = ?
+    """
+    try:
+        rs = conn.execute(query, [contract_id])
+        # Trả về list tuple (loai_cho, gia_tri)
+        return [(row[0], row[1]) for row in rs.rows]
+    except Exception as e:
+        print(f"Error fetching waiting periods for contract {contract_id}: {e}")
         return []
 
-    # --- Bước 2: Lấy tất cả chi tiết cho các hợp đồng đã tìm thấy ---
-    ids_placeholder = ','.join('?' for _ in matching_ids)
-    details_params = list(matching_ids)
+def get_benefits_for_contract(conn, contract_id):
+    """Trả về list[(ten_quyenloi, han_muc, mo_ta)] để UI hiển thị."""
+    query = """
+        SELECT ten_quyenloi, han_muc, mo_ta
+        FROM quyenloi_chitiet
+        WHERE hopdong_id = ?
+    """
+    try:
+        rs = conn.execute(query, [contract_id])
+        return [(row[0], row[1], row[2]) for row in rs.rows]
+    except Exception as e:
+        print(f"Error fetching benefits for contract {contract_id}: {e}")
+        return []
 
-    details_query = f"""
-        SELECT
-            h.id AS hopdong_id, h.soHopDong, h.tenCongTy, h.HLBH_tu, h.HLBH_den, h.coPay, h.mr_app,
-            scf.mo_ta AS signCF_mo_ta,
-            tgc.loai_cho AS thoigiancho_loai,
-            hqc.gia_tri AS thoigiancho_giatri,
-            q.ten_quyenloi, q.han_muc, q.mo_ta AS quyenloi_mo_ta
-        FROM
-            hopdong_baohiem h
-        LEFT JOIN sign_CF scf ON h.sign_CF_id = scf.id
-        LEFT JOIN hopdong_quydinh_cho hqc ON h.id = hqc.hopdong_id
-        LEFT JOIN thoi_gian_cho tgc ON hqc.cho_id = tgc.id
-        LEFT JOIN quyenloi_chitiet q ON h.id = q.hopdong_id
-        WHERE h.id IN ({ids_placeholder})"""
+def get_special_cards_for_contract(conn, contract_id):
+    """Trả về danh sách thẻ đặc biệt của hợp đồng với tên cột đúng UI mong đợi."""
+    query = """
+        SELECT so_the, ten_NDBH, ghi_chu
+        FROM sothe_dacbiet
+        WHERE hopdong_id = ?
+    """
+    try:
+        rs = conn.execute(query, [contract_id])
+        return _to_dicts(rs)
+    except Exception as e:
+        print(f"Error fetching special cards for contract {contract_id}: {e}")
+        return []
+        print(f"Error fetching special cards for contract {contract_id}: {e}")
+        return []
 
-    if benefit_group_ids:
-        nhom_ids_placeholder = ','.join('?' for _ in benefit_group_ids)
-        details_query += f" AND (q.nhom_id IS NULL OR q.nhom_id IN ({nhom_ids_placeholder}))"
-        details_params.extend(benefit_group_ids)
-
-    details_query += " ORDER BY h.soHopDong, q.ten_quyenloi, tgc.loai_cho"
-
-    all_details = cursor.execute(details_query, details_params).fetchall()
-
-    # --- Bước 3: Xử lý và nhóm kết quả bằng Python ---
-    contracts_data = {}
-    for row in all_details:
-        hd_id = row['hopdong_id']
-        if hd_id not in contracts_data:
-            contracts_data[hd_id] = {
-                'details': {
-                    'id': hd_id, 
-                    'soHopDong': row['soHopDong'], 'tenCongTy': row['tenCongTy'],
-                    'HLBH_tu': row['HLBH_tu'], 'HLBH_den': row['HLBH_den'],
-                    'coPay': row['coPay'], 'signCF': row['signCF_mo_ta'],
-                    'mr_app': row['mr_app']
-                },
-                'waiting_periods': set(),
-                'benefits': set(),
-                'special_cards': [] # Khởi tạo là list trống
-            }
-        
-        if row['thoigiancho_loai']:
-            contracts_data[hd_id]['waiting_periods'].add(
-                (row['thoigiancho_loai'], row['thoigiancho_giatri'])
-            )
-
-        if row['ten_quyenloi']:
-            contracts_data[hd_id]['benefits'].add(
-                (row['ten_quyenloi'], row['han_muc'], row['quyenloi_mo_ta'])
-            )
-
-    # --- Bước 4: Lấy thông tin thẻ đặc biệt cho từng hợp đồng ---
-    for hd_id in contracts_data:
-        cursor.execute("SELECT so_the, ten_NDBH, ghi_chu FROM sothe_dacbiet WHERE hopdong_id = ?", (hd_id,))
-        special_cards_raw = cursor.fetchall()
-        contracts_data[hd_id]['special_cards'] = [dict(card) for card in special_cards_raw]
-
-    conn.close() # Đóng kết nối sau khi tất cả các truy vấn hoàn tất
-
-    # --- Bước 5: Chuyển set thành list và sắp xếp để có thứ tự nhất quán ---
-    final_results = []
-    for hd_id in sorted(contracts_data.keys()):
-        data = contracts_data[hd_id]
-        data['waiting_periods'] = sorted(list(data['waiting_periods']))
-        data['benefits'] = sorted(list(data['benefits']))
-        final_results.append(data)
-        
-    return final_results
+def add_benefit(contract_id, benefit_group_id, benefit_name, benefit_limit, benefit_desc):
+    """Adds a single benefit to a contract."""
+    client = get_db_connection()
+    try:
+        client.execute(
+            """INSERT INTO quyenloi_chitiet (hopdong_id, nhom_id, ten_quyen_loi, gioi_han, mo_ta) 
+               VALUES (?, ?, ?, ?, ?)""",
+            [contract_id, benefit_group_id, benefit_name, benefit_limit, benefit_desc]
+        )
+        print(f"Successfully added benefit '{benefit_name}' to contract {contract_id}.")
+        return True
+    except Exception as e:
+        print(f"Error adding benefit to contract {contract_id}: {e}")
+        return False
+    finally:
+        client.close()
 
 def get_all_waiting_times():
-    """Lấy danh sách tất cả các loại thời gian chờ."""
-    conn = get_db_connection()
-    waiting_times = conn.execute("SELECT id, loai_cho, mo_ta FROM thoi_gian_cho ORDER BY id").fetchall()
-    conn.close()
-    return waiting_times
+    """Retrieves all waiting time options."""
+    client = get_db_connection()
+    try:
+        rs = client.execute("SELECT id, loai_cho, mo_ta FROM thoi_gian_cho ORDER BY id")
+        return _to_dicts(rs)
+    except Exception as e:
+        print(f"Error getting waiting times: {e}")
+        return []
+    finally:
+        client.close()
 
 def add_waiting_time(loai_cho, mo_ta):
-    """Thêm một quy định thời gian chờ mới."""
-    conn = get_db_connection()
+    """Adds a new waiting time definition."""
+    client = get_db_connection()
     try:
-        conn.execute("INSERT INTO thoi_gian_cho (loai_cho, mo_ta) VALUES (?, ?)", (loai_cho, mo_ta))
-        conn.commit()
-        return True, "Thêm mới thành công!"
-    except sqlite3.IntegrityError:
-        return False, "Lỗi: Dữ liệu có thể đã tồn tại."
+        client.execute(
+            "INSERT INTO thoi_gian_cho (loai_cho, mo_ta) VALUES (?, ?)",
+            [loai_cho, mo_ta]
+        )
+        return True
     except Exception as e:
-        return False, f"Đã xảy ra lỗi: {e}"
+        print(f"Error adding waiting time (might be a duplicate): {e}")
+        return False
     finally:
-        conn.close()
+        client.close()

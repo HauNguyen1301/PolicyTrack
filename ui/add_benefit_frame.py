@@ -9,6 +9,7 @@ class AddBenefitFrame(ttk.Frame):
         super().__init__(parent)
         self.controller = controller
         self.current_contract = None
+        self.contracts_data = {}
         
         # Configure compact button style
         style = ttk.Style()
@@ -182,11 +183,24 @@ class AddBenefitFrame(ttk.Frame):
         self.benefit_details_frame = ttk.Frame(self.add_benefit_frame)
         self.benefit_details_frame.grid(row=1, column=0, columnspan=6, sticky="nsew")
         
-        # Load benefit types from database
-        self.load_benefit_types()
+        # Benefit Type selection using a Combobox
+        ttk.Label(self.benefit_type_frame, text="Nhóm quyền lợi:").grid(row=0, column=0, padx=(0, 5), pady=5, sticky='w')
+        self.benefit_group_var = tk.StringVar()
+        self.benefit_group_combo = ttk.Combobox(
+            self.benefit_type_frame, 
+            textvariable=self.benefit_group_var, 
+            state="readonly",
+            width=38 # Adjusted width
+        )
+        self.benefit_group_combo.grid(row=0, column=1, columnspan=3, sticky='we', pady=5)
+        self.load_benefit_groups() # Load data into combobox
         
         # Configure benefit details form
         self.setup_benefit_details_form()
+
+        # Submit Button
+        submit_button = ttk.Button(self.add_benefit_frame, text="Lưu quyền lợi", command=self.submit_benefit, style="Accent.TButton")
+        submit_button.grid(row=2, column=0, columnspan=6, pady=(15, 5))
         
         # Status bar (use grid instead of pack)
         self.rowconfigure(2, weight=0)
@@ -232,101 +246,55 @@ class AddBenefitFrame(ttk.Frame):
             self.benefit_desc_text.delete("1.0", tk.END)
     
     def search_contract(self):
-        """Tìm kiếm hợp đồng theo số hợp đồng hoặc tên công ty"""
+        """Searches for contracts using the new database function."""
         search_term = self.search_var.get().strip()
-        
         if not search_term:
             messagebox.showwarning("Cảnh báo", "Vui lòng nhập số hợp đồng hoặc tên công ty để tìm kiếm")
             return
-            
-        conn = None
+
         try:
-
-            # Tìm kiếm hợp đồng phù hợp với từ khóa tìm kiếm
-            query = """
-                SELECT id, soHopDong, tenCongTy, HLBH_tu, HLBH_den 
-                FROM hopdong_baohiem 
-                WHERE (soHopDong LIKE ? OR tenCongTy LIKE ?) 
-                AND isActive = 1
-                ORDER BY HLBH_den DESC
-                LIMIT 100
-            """
-            search_pattern = f"%{search_term}%"
+            # Use the new unified search function. It searches both fields.
+            results = db.search_contracts(company_name=search_term, contract_number=search_term)
             
-            # In thông tin debug
-            print(f"Đang tìm kiếm với từ khóa: {search_pattern}")
+            # Clear previous results from tree and data store
+            for item in self.tree.get_children():
+                self.tree.delete(item)
+            self.contracts_data.clear()
+
+            if not results:
+                messagebox.showinfo("Thông báo", "Không tìm thấy hợp đồng nào phù hợp")
+                self.status_label.config(text="Không tìm thấy hợp đồng nào phù hợp", style="Error.TLabel")
+                return
+
+            # Populate treeview and store full data for later use
+            for contract in results:
+                details = contract['details']
+                hd_id = details['id']
+                self.contracts_data[str(hd_id)] = contract  # Store by ID as string
+                
+                self.tree.insert(
+                    "", 
+                    "end", 
+                    text=str(hd_id),  # Store the contract ID in the hidden text field
+                    values=(
+                        details.get('soHopDong', ''),
+                        details.get('tenCongTy', ''),
+                        format_date(details.get('HLBH_tu', '')),
+                        format_date(details.get('HLBH_den', ''))
+                    )
+                )
             
-            try:
-                conn = db.get_db_connection()
-                print("Đã kết nối đến cơ sở dữ liệu")
-                
-                cursor = conn.cursor()
-                cursor.execute(query, (search_pattern, search_pattern))
-                results = cursor.fetchall()
-                
-                print(f"Tìm thấy {len(results)} kết quả")
-                
-                if not results:
-                    messagebox.showinfo("Thông báo", "Không tìm thấy hợp đồng nào phù hợp")
-                    self.status_label.config(
-                        text="Không tìm thấy hợp đồng nào phù hợp", 
-                        style="Error.TLabel"
-                    )
-                    return
+            self.status_label.config(text=f"Tìm thấy {len(results)} hợp đồng phù hợp", style="Success.TLabel")
 
-                # Có kết quả mới → xoá danh sách cũ rồi hiển thị
-                for item in self.tree.get_children():
-                    self.tree.delete(item)
-
-                # Thêm kết quả vào treeview với định dạng ngày dd/mm/yyyy
-                for row in results:
-                    self.tree.insert(
-                        "", 
-                        "end", 
-                        text=str(row[0]),  # Lưu ID hợp đồng
-                        values=(
-                            row[1],                 # soHopDong
-                            row[2],                 # tenCongTy
-                            format_date(row[3]),    # HLBH_tu
-                            format_date(row[4])     # HLBH_den
-                        )
-                    )
-                
-                self.status_label.config(
-                    text=f"Tìm thấy {len(results)} hợp đồng phù hợp", 
-                    style="Success.TLabel"
-                )
-                
-            except Exception as e:
-                import traceback
-                error_details = traceback.format_exc()
-                print(f"Lỗi khi thực hiện truy vấn: {error_details}")
-                messagebox.showerror("Lỗi", f"Lỗi khi thực hiện tìm kiếm: {str(e)}\n\nChi tiết lỗi đã được ghi vào console.")
-                self.status_label.config(
-                    text="Đã xảy ra lỗi khi tìm kiếm", 
-                    style="Error.TLabel"
-                )
-                
         except Exception as e:
             import traceback
             error_details = traceback.format_exc()
-            print(f"Lỗi không xác định: {error_details}")
-            messagebox.showerror("Lỗi", f"Đã xảy ra lỗi không xác định: {str(e)}")
-            self.status_label.config(
-                text="Đã xảy ra lỗi không xác định", 
-                style="Error.TLabel"
-            )
-            
-        finally:
-            if conn:
-                try:
-                    conn.close()
-                    print("Đã đóng kết nối cơ sở dữ liệu")
-                except Exception as e:
-                    print(f"Lỗi khi đóng kết nối: {str(e)}")
+            print(f"Lỗi khi tìm kiếm hợp đồng: {error_details}")
+            messagebox.showerror("Lỗi", f"Lỗi khi thực hiện tìm kiếm: {e}")
+            self.status_label.config(text="Đã xảy ra lỗi khi tìm kiếm", style="Error.TLabel")
     
     def on_contract_select(self, event):
-        """Handle contract selection from search results"""
+        """Handle contract selection from search results."""
         try:
             tree = event.widget
             selected_items = tree.selection()
@@ -335,44 +303,32 @@ class AddBenefitFrame(ttk.Frame):
                 return
                 
             selected_item = selected_items[0]
-            item_values = tree.item(selected_item, "values")
+            contract_id = tree.item(selected_item, "text") # Get ID from hidden text
             
-            if not item_values:
+            if not contract_id or contract_id not in self.contracts_data:
+                print(f"Error: Contract ID '{contract_id}' not found in stored data.")
                 return
                 
-            # Store selected contract info
-            self.current_contract = {
-                "id": tree.item(selected_item, "text"),  # Store the contract ID
-                "soHopDong": item_values[0],
-                "tenCongTy": item_values[1],
-                "HLBH_tu": item_values[2],
-                "HLBH_den": item_values[3]
-            }
+            # Retrieve the full contract data from our stored dictionary
+            self.current_contract = self.contracts_data[contract_id]
             
-            # Highlight the selected row
-            for item in tree.selection():
-                tree.selection_remove(item)
-            tree.selection_add(selected_item)
-            tree.focus(selected_item)
-            
-            # Update contract info frame
+            # Update contract info frame with detailed data
             self.update_contract_info()
             
-            # Enable the form
+            # Enable the benefit submission form
             self.toggle_benefit_form(True)
             
-            # Update status
+            # Update status bar
             self.status_label.config(
-                text=f"Đã chọn hợp đồng: {self.current_contract['soHopDong']}",
+                text=f"Đã chọn hợp đồng: {self.current_contract['details']['soHopDong']}",
                 style="Success.TLabel"
             )
             
         except Exception as e:
-            messagebox.showerror("Lỗi", f"Không thể chọn hợp đồng: {str(e)}")
-            self.status_label.config(
-                text="Đã xảy ra lỗi khi chọn hợp đồng",
-                style="Error.TLabel"
-            )
+            import traceback
+            print(traceback.format_exc())
+            messagebox.showerror("Lỗi", f"Không thể chọn hợp đồng: {e}")
+            self.status_label.config(text="Đã xảy ra lỗi khi chọn hợp đồng", style="Error.TLabel")
     
     def update_contract_info(self):
         """Update the contract information display"""
@@ -452,162 +408,75 @@ class AddBenefitFrame(ttk.Frame):
             
         except Exception as e:
             messagebox.showerror("Lỗi", f"Không thể cập nhật thông tin hợp đồng: {str(e)}")
-            self.status_label.config(
-                text="Đã xảy ra lỗi khi cập nhật thông tin hợp đồng",
-                style="Error.TLabel"
-            )
     
-    def load_benefit_types(self):
-        """Tải danh sách các nhóm quyền lợi từ cơ sở dữ liệu"""
+
+    
+    def load_benefit_groups(self):
+        """Loads benefit groups from the database into the combobox."""
         try:
-            conn = db.get_db_connection()
-            cursor = conn.cursor()
-            cursor.execute("SELECT id, ten_nhom, mo_ta FROM nhom_quyenloi ORDER BY id")
-            benefit_types = cursor.fetchall()
-            
-            # Tạo các nút radio cho từng nhóm quyền lợi
-            self.benefit_type_var = tk.StringVar()
-            
-            for i, (type_id, ten_nhom, mo_ta) in enumerate(benefit_types):
-                btn = ttk.Radiobutton(
-                    self.benefit_type_frame,
-                    text=ten_nhom,
-                    variable=self.benefit_type_var,
-                    value=type_id,
-                    command=self.on_benefit_type_select
-                )
-                btn.grid(row=0, column=i, padx=5, pady=5, sticky="nsew")
-                
-                # Tooltip cho mô tả chi tiết
-                tooltip = f"{ten_nhom}"
-                if mo_ta:
-                    tooltip += f"\n{mo_ta}"
-                self.create_tooltip(btn, tooltip)
-                
-                # Chọn nhóm đầu tiên mặc định
-                if i == 0:
-                    self.benefit_type_var.set(type_id)
-                    
+            groups = db.get_all_benefit_groups()
+            self.benefit_groups_map = {g['ten_nhom']: g['id'] for g in groups}
+            self.benefit_group_combo['values'] = list(self.benefit_groups_map.keys())
         except Exception as e:
-            messagebox.showerror("Lỗi", f"Không thể tải danh sách quyền lợi: {str(e)}")
-        finally:
-            if 'conn' in locals():
-                conn.close()
-    
+            messagebox.showerror("Lỗi", f"Không thể tải danh sách nhóm quyền lợi: {e}")
+
     def setup_benefit_details_form(self):
-        """Tạo form nhập thông tin chi tiết quyền lợi"""
-        # Tạo các label
-        ttk.Label(self.benefit_details_frame, text="Tên quyền lợi:").grid(row=0, column=0, padx=5, pady=2, sticky="e")
-        ttk.Label(self.benefit_details_frame, text="Hạn mức:").grid(row=1, column=0, padx=5, pady=2, sticky="e")
-        ttk.Label(self.benefit_details_frame, text="Nội dung:").grid(row=2, column=0, padx=5, pady=2, sticky="ne")
-        
-        # Tạo các ô nhập liệu
-        self.benefit_name_entry = ttk.Entry(self.benefit_details_frame)
-        self.benefit_limit_entry = ttk.Entry(self.benefit_details_frame)
-        self.benefit_desc_text = tk.Text(
-            self.benefit_details_frame,
-            height=4,
-            wrap=tk.WORD,
-            font=("Segoe UI", 10)
-        )
-        
-        # Đặt vị trí các ô nhập liệu
-        self.benefit_name_entry.grid(row=0, column=1, columnspan=4, padx=5, pady=2, sticky="ew")
-        self.benefit_limit_entry.grid(row=1, column=1, padx=5, pady=2, sticky="w")
-        self.benefit_desc_text.grid(row=2, column=1, columnspan=4, padx=5, pady=2, sticky="nsew")
-        
-        # Nút lưu
-        save_btn = ttk.Button(
-            self.benefit_details_frame,
-            text="Lưu quyền lợi",
-            command=self.save_benefit,
-            style="Accent.TButton"
-        )
-        save_btn.grid(row=3, column=4, padx=5, pady=10, sticky="e")
-        
-        # Cấu hình grid
+        """Creates the form for benefit details."""
+        # Configure grid
         self.benefit_details_frame.columnconfigure(1, weight=1)
+
+        # Labels
+        ttk.Label(self.benefit_details_frame, text="Tên quyền lợi:").grid(row=0, column=0, padx=5, pady=5, sticky="e")
+        ttk.Label(self.benefit_details_frame, text="Hạn mức:").grid(row=1, column=0, padx=5, pady=5, sticky="e")
+        ttk.Label(self.benefit_details_frame, text="Mô tả chi tiết:").grid(row=2, column=0, padx=5, pady=5, sticky="ne")
+        
+        # Entry fields
+        self.benefit_name_entry = ttk.Entry(self.benefit_details_frame, width=40)
+        self.benefit_limit_entry = ttk.Entry(self.benefit_details_frame, width=40)
+        self.benefit_desc_text = tk.Text(self.benefit_details_frame, height=4, wrap=tk.WORD, font=("Segoe UI", 10))
+        
+        # Layout
+        self.benefit_name_entry.grid(row=0, column=1, padx=5, pady=5, sticky="ew")
+        self.benefit_limit_entry.grid(row=1, column=1, padx=5, pady=5, sticky="ew")
+        self.benefit_desc_text.grid(row=2, column=1, padx=5, pady=5, sticky="nsew")
+        
         self.benefit_details_frame.rowconfigure(2, weight=1)
-    
-    def on_benefit_type_select(self):
-        """Xử lý khi chọn loại quyền lợi"""
-        # Có thể thêm xử lý khi chọn loại quyền lợi khác
-        pass
-    
-    def save_benefit(self):
-        """Lưu thông tin quyền lợi vào cơ sở dữ liệu"""
+
+    def submit_benefit(self):
+        """Validates form data and submits the new benefit to the database."""
         if not self.current_contract:
-            messagebox.showwarning("Cảnh báo", "Vui lòng chọn hợp đồng trước khi thêm quyền lợi")
+            messagebox.showwarning("Cảnh báo", "Vui lòng chọn một hợp đồng trước khi thêm quyền lợi.")
             return
-            
-        ten_quyenloi = self.benefit_name_entry.get().strip()
-        han_muc = self.benefit_limit_entry.get().strip()
-        mo_ta = self.benefit_desc_text.get("1.0", tk.END).strip()
-        nhom_id = self.benefit_type_var.get()
-        
-        if not ten_quyenloi:
-            messagebox.showwarning("Cảnh báo", "Vui lòng nhập tên quyền lợi")
+
+        # --- Get and validate data ---
+        group_name = self.benefit_group_var.get()
+        benefit_name = self.benefit_name_entry.get().strip()
+        benefit_limit = self.benefit_limit_entry.get().strip()
+        benefit_desc = self.benefit_desc_text.get("1.0", tk.END).strip()
+
+        if not all([group_name, benefit_name, benefit_limit]):
+            messagebox.showwarning("Thiếu thông tin", "Vui lòng điền đầy đủ các trường bắt buộc: Nhóm, Tên, và Giới hạn quyền lợi.")
             return
-            
+
         try:
-            conn = db.get_db_connection()
-            cursor = conn.cursor()
-            
-            # Thêm quyền lợi vào bảng quyenloi_chitiet
-            cursor.execute("""
-                INSERT INTO quyenloi_chitiet 
-                (hopdong_id, nhom_id, ten_quyenloi, han_muc, mo_ta, created_at)
-                VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-            """, (self.current_contract['id'], nhom_id, ten_quyenloi, han_muc, mo_ta))
-            
-            conn.commit()
-            messagebox.showinfo("Thành công", "Đã thêm quyền lợi mới thành công!")
-            
-            # Xóa nội dung form
-            self.clear_benefit_form()
-            
+            group_id = self.benefit_groups_map[group_name]
+            contract_id = self.current_contract['details']['id']
+
+            # --- Add to DB ---
+            success = db.add_benefit(contract_id, group_id, benefit_name, benefit_limit, benefit_desc)
+
+            if success:
+                messagebox.showinfo("Thành công", f"Đã thêm quyền lợi '{benefit_name}' vào hợp đồng.")
+                # Clear form for next entry
+                self.benefit_name_entry.delete(0, tk.END)
+                self.benefit_limit_entry.delete(0, tk.END)
+                self.benefit_desc_text.delete("1.0", tk.END)
+                self.benefit_group_combo.set('')
+                self.benefit_name_entry.focus()
+            else:
+                messagebox.showerror("Lỗi", "Không thể lưu quyền lợi vào cơ sở dữ liệu.")
+
+        except KeyError:
+            messagebox.showerror("Lỗi", "Nhóm quyền lợi không hợp lệ.")
         except Exception as e:
-            messagebox.showerror("Lỗi", f"Không thể lưu quyền lợi: {str(e)}")
-        finally:
-            if 'conn' in locals():
-                conn.close()
-    
-    def create_tooltip(self, widget, text):
-        """Tạo tooltip cho widget"""
-        tooltip = tk.Toplevel(widget)
-        tooltip.wm_overrideredirect(True)
-        tooltip.wm_geometry("+0+0")
-        tooltip.withdraw()
-        
-        label = ttk.Label(tooltip, text=text, background="#ffffe0", relief="solid", borderwidth=1, padding=5)
-        label.pack()
-        
-        def enter(event):
-            x = widget.winfo_rootx() + widget.winfo_width() // 2
-            y = widget.winfo_rooty() + widget.winfo_height()
-            tooltip.wm_geometry(f"+{x}+{y}")
-            tooltip.deiconify()
-        
-        def leave(event):
-            tooltip.withdraw()
-            
-        widget.bind('<Enter>', enter)
-        widget.bind('<Leave>', leave)
-    
-    def clear_benefit_form(self):
-        """Xóa nội dung các trường nhập liệu trong form thêm quyền lợi"""
-        if hasattr(self, 'benefit_name_entry'):
-            self.benefit_name_entry.delete(0, tk.END)
-        if hasattr(self, 'benefit_limit_entry'):
-            self.benefit_limit_entry.delete(0, tk.END)
-        if hasattr(self, 'benefit_desc_text'):
-            self.benefit_desc_text.delete("1.0", tk.END)
-    
-    def add_new_benefit(self):
-        """Xử lý thêm quyền lợi mới"""
-        if not self.current_contract:
-            return
-            
-        self.load_benefit_types()
-        self.setup_benefit_details_form()
-        self.clear_benefit_form()  # Đảm bảo form trống khi thêm mới
+            messagebox.showerror("Lỗi", f"Đã xảy ra lỗi khi lưu quyền lợi: {e}")
