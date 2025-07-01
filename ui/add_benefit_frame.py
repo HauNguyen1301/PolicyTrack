@@ -183,17 +183,16 @@ class AddBenefitFrame(ttk.Frame):
         self.benefit_details_frame = ttk.Frame(self.add_benefit_frame)
         self.benefit_details_frame.grid(row=1, column=0, columnspan=6, sticky="nsew")
         
-        # Benefit Type selection using a Combobox
+        # Benefit Type selection using Radiobuttons
         ttk.Label(self.benefit_type_frame, text="Nhóm quyền lợi:").grid(row=0, column=0, padx=(0, 5), pady=5, sticky='w')
         self.benefit_group_var = tk.StringVar()
-        self.benefit_group_combo = ttk.Combobox(
-            self.benefit_type_frame, 
-            textvariable=self.benefit_group_var, 
-            state="readonly",
-            width=38 # Adjusted width
-        )
-        self.benefit_group_combo.grid(row=0, column=1, columnspan=3, sticky='we', pady=5)
-        self.load_benefit_groups() # Load data into combobox
+
+        # Container frame for radiobuttons
+        self.benefit_groups_frame = ttk.Frame(self.benefit_type_frame)
+        self.benefit_groups_frame.grid(row=0, column=1, columnspan=5, sticky='w')
+
+        # Load radiobuttons from DB
+        self.load_benefit_groups()
         
         # Configure benefit details form
         self.setup_benefit_details_form()
@@ -420,7 +419,20 @@ class AddBenefitFrame(ttk.Frame):
         try:
             groups = db.get_all_benefit_groups()
             self.benefit_groups_map = {g['ten_nhom']: g['id'] for g in groups}
-            self.benefit_group_combo['values'] = list(self.benefit_groups_map.keys())
+
+            # Clear any existing radiobuttons
+            for child in self.benefit_groups_frame.winfo_children():
+                child.destroy()
+
+            # Create radiobutton for each group
+            for idx, name in enumerate(self.benefit_groups_map.keys()):
+                rb = ttk.Radiobutton(
+                    self.benefit_groups_frame,
+                    text=name,
+                    variable=self.benefit_group_var,
+                    value=name
+                )
+                rb.grid(row=0, column=idx, padx=2, pady=2, sticky='w')
         except Exception as e:
             messagebox.showerror("Lỗi", f"Không thể tải danh sách nhóm quyền lợi: {e}")
 
@@ -475,7 +487,7 @@ class AddBenefitFrame(ttk.Frame):
                 self.benefit_name_entry.delete(0, tk.END)
                 self.benefit_limit_entry.delete(0, tk.END)
                 self.benefit_desc_text.delete("1.0", tk.END)
-                self.benefit_group_combo.set('')
+                self.benefit_group_var.set('')
                 self.benefit_name_entry.focus()
             else:
                 messagebox.showerror("Lỗi", "Không thể lưu quyền lợi vào cơ sở dữ liệu.")

@@ -13,6 +13,32 @@ from ui.login_frame import LoginFrame
 from ui.main_app_frame import MainApplicationFrame
 import database
 
+# ====== Update checking imports ======
+import threading
+import requests
+from packaging.version import parse as _vparse
+from policytrack_version import __version__
+
+# URL tới file JSON chứa thông tin phiên bản mới nhất
+UPDATE_URL = "https://raw.githubusercontent.com/<user>/PolicyTrack/main/updates/latest.json"
+
+def _check_for_update(parent):
+    """Chạy ở luồng nền; nếu có version mới thì thông báo."""
+    try:
+        resp = requests.get(UPDATE_URL, timeout=3)
+        data = resp.json()
+        remote_ver = data.get("version", "")
+        if remote_ver and _vparse(remote_ver) > _vparse(__version__):
+            notes = data.get("notes", "")
+            parent.after(0, lambda: messagebox.showinfo(
+                "Có phiên bản mới",
+                f"Version {remote_ver} đã sẵn sàng!\n\n{notes}",
+                parent=parent
+            ))
+    except Exception:
+        # Im lặng nếu không thể kiểm tra (offline, lỗi JSON, v.v.)
+        pass
+
 
 class App(tk.Tk):
     def __init__(self):
