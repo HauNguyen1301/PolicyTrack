@@ -55,11 +55,11 @@ def main():
 
     output_name = args.output
 
-    # Always clean previous output to avoid confusion
-    for d in (PROJECT_ROOT / "build", PROJECT_ROOT / "dist"):
-        if d.exists():
-            print(f"Removing {d} …")
-            shutil.rmtree(d, ignore_errors=True)
+    # Clean previous *build* directory to avoid stale object files but keep existing 'dist' folder
+    build_dir = PROJECT_ROOT / "build"
+    if build_dir.exists():
+        print(f"Removing {build_dir} …")
+        shutil.rmtree(build_dir, ignore_errors=True)
 
     nuitka_opts = [
         "-m",
@@ -73,7 +73,6 @@ def main():
         "--include-module=bcrypt",
         "--include-module=bcrypt._bcrypt",
         "--include-module=libsql_client",
-        "--include-module=dotenv",
         "--include-data-files=utils/*=utils/",
         "--include-data-files=ui/*=ui/",
         f"--output-filename={output_name}",
@@ -93,8 +92,12 @@ def main():
     exe_src = PROJECT_ROOT / exe_name
     dist_dir = PROJECT_ROOT / "dist"
     dist_dir.mkdir(exist_ok=True)
+    dest_exe = dist_dir / exe_name
+    # Replace old exe if it exists
+    if dest_exe.exists():
+        dest_exe.unlink(missing_ok=True)
     if exe_src.exists():
-        shutil.move(str(exe_src), dist_dir / exe_name)
+        shutil.move(str(exe_src), dest_exe)
         print(f"Moved {exe_name} -> dist/{exe_name}")
 
     # Clean up any build artifacts to leave only the dist folder with the final exe

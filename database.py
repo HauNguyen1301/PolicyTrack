@@ -31,15 +31,11 @@ def get_db_connection() -> libsql_client.Client:
             except Exception:
                 pass
             _CLIENT = None
-        if not TURSO_DATABASE_URL or not TURSO_AUTH_TOKEN:
-            raise RuntimeError("Missing Turso environment variables")
+        
         http_url = TURSO_DATABASE_URL.replace("libsql", "https", 1)
         _CLIENT = libsql_client.create_client_sync(url=http_url, auth_token=TURSO_AUTH_TOKEN)
         _CLIENT_CREATED_AT = now
-        if not TURSO_DATABASE_URL or not TURSO_AUTH_TOKEN:
-            raise RuntimeError("Missing Turso environment variables")
-        http_url = TURSO_DATABASE_URL.replace("libsql", "https", 1)
-        _CLIENT = libsql_client.create_client_sync(url=http_url, auth_token=TURSO_AUTH_TOKEN)
+        
     return _CLIENT
 
 
@@ -350,8 +346,9 @@ def search_contracts(company_name='', contract_number='', benefit_group_ids=None
             FROM hopdong_baohiem hdb
             LEFT JOIN sign_CF sc ON hdb.sign_CF_id = sc.id
         """
-        conditions = []
-        params = [] # Use a list for positional parameters
+        # Luôn lọc hợp đồng đang hoạt động
+        conditions = ["hdb.isActive = 1"]
+        params = []  # Use a list for positional parameters
 
         if company_name:
             conditions.append("tenCongTy LIKE ?")
@@ -363,6 +360,9 @@ def search_contracts(company_name='', contract_number='', benefit_group_ids=None
 
         if conditions:
             base_query += " WHERE " + " AND ".join(conditions)
+
+        # Giới hạn số kết quả tối đa 10 bản ghi để giảm tải UI
+        base_query += " LIMIT 10"
 
         # Execute the primary search query
         rs = conn.execute(base_query, params)

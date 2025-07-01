@@ -5,6 +5,7 @@ import asyncio
 if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
+# link check version : https://raw.githubusercontent.com/HauNguyen1301/PolicyTrack/refs/heads/main/updates/latest.json
 
 
 import tkinter as tk
@@ -17,6 +18,7 @@ import database
 import threading
 import requests
 from packaging.version import parse as _vparse
+import webbrowser
 from policytrack_version import __version__
 
 # URL tới file JSON chứa thông tin phiên bản mới nhất
@@ -41,17 +43,44 @@ def _check_for_update(parent):
                 notes = "\n".join(f"- {line}" for line in raw_notes)
             else:
                 notes = str(raw_notes)
-            parent.after(0, lambda: messagebox.showinfo(
-                "Có phiên bản mới",
-                f"Version {remote_ver} đã sẵn sàng!\n\n{notes}",
-                parent=parent
-            ))
+            parent.after(0, lambda: _show_update_dialog(parent, remote_ver, notes))
     except Exception as e:
         if __debug__:
             print('[UpdateCheck] Error:', e)
 
         # Im lặng nếu không thể kiểm tra (offline, lỗi JSON, v.v.)
         pass
+
+# ---- Custom update dialog ----
+DOWNLOAD_URL = "https://1drv.ms/f/c/5f21643f394cb276/EmPmLLE1dYtNrzdyMwIzwQgB-662e46VFM1G0CWAz74x5w"
+
+def _show_update_dialog(parent: tk.Tk, remote_ver: str, notes: str):
+    """Hiển thị hộp thoại cập nhật với nút Download."""
+    dlg = tk.Toplevel(parent)
+    dlg.title("Có phiên bản mới")
+    dlg.transient(parent)
+    dlg.grab_set()
+    dlg.resizable(False, False)
+
+    ttk.Label(dlg, text=f"Version {remote_ver} đã sẵn sàng!", font=("Segoe UI", 10, "bold"), justify="left").pack(padx=20, pady=(15, 5))
+    ttk.Label(dlg, text=notes, justify="left").pack(padx=20, pady=(0, 10))
+
+    btn_frame = ttk.Frame(dlg)
+    btn_frame.pack(pady=(0, 15))
+
+    def _open_download():
+        webbrowser.open_new(DOWNLOAD_URL)
+        dlg.destroy()
+
+    ttk.Button(btn_frame, text="Download", command=_open_download).pack(side="left", padx=5)
+    ttk.Button(btn_frame, text="Đóng", command=dlg.destroy).pack(side="left", padx=5)
+
+    # Canh giữa dialog so với parent
+    parent.update_idletasks()
+    w, h = dlg.winfo_reqwidth(), dlg.winfo_reqheight()
+    x = parent.winfo_x() + (parent.winfo_width() - w) // 2
+    y = parent.winfo_y() + (parent.winfo_height() - h) // 2
+    dlg.geometry(f"{w}x{h}+{x}+{y}")
 
 
 class App(tk.Tk):
