@@ -1,1 +1,8 @@
-{ "version": "0.1.4", "notes": "Add checking Version." }
+{
+  "version": "0.1.2",
+  "notes": [
+    "Add checking Version.",
+    "Improve search speed.",
+    "UI tweaks."
+  ]
+}
