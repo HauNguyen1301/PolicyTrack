@@ -1,0 +1,9 @@
+==============================
+Update Log - PolicyTrack
+==============================
+
+2025-07-01 16:05:38  |  v0.1.1
+--------------------------------
+1. Thay đổi title cửa sổ chính thành "PolicyTrack v0.1.1" (main.py).
+2. Bổ sung lọc quyền lợi theo nhóm khi tìm kiếm hợp đồng (database.py & contract_view_panel).
+

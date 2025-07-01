@@ -2,20 +2,55 @@ import os
 from typing import Any, Dict, List, Tuple
 import bcrypt
 import re
-from dotenv import load_dotenv
 import libsql_client
 
 # --- Load Environment Variables for Turso ---
-load_dotenv()
-TURSO_DATABASE_URL = os.getenv("TURSO_DATABASE_URL")
-TURSO_AUTH_TOKEN = os.getenv("TURSO_AUTH_TOKEN")
-# --- Turso Connection Helper ---
+
+TURSO_DATABASE_URL = "libsql://policytrack-huuhaubaoviet.aws-ap-northeast-1.turso.io"
+TURSO_AUTH_TOKEN = "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3NTEyNTc1NjIsImlkIjoiMjYwNmMwZmQtNzQ4YS00YTQzLWE3ZjItY2JlODFmNDBlNGYyIiwicmlkIjoiYmU1MDQxZjItODQwZi00OWQ3LTk4NzEtY2VlNDViMThmOTZmIn0.xzbYZVdsvQgd2ZBC4Ac_KYRxzCFREl8ktQS9inwwFWKpw8Ca-paj_VyY_R4Ygv01h5Or4THUBLyIsK_BzQSmDA"
+# --- Turso Connection Helper (singleton) ---
+from typing import Optional
+from datetime import datetime, timedelta
+
+_CLIENT: Optional[libsql_client.Client] = None
+_CLIENT_CREATED_AT: Optional[datetime] = None  # UTC timestamp of creation
+
 def get_db_connection() -> libsql_client.Client:
-    """Return a synchronous Turso client using HTTPS."""
-    if not TURSO_DATABASE_URL or not TURSO_AUTH_TOKEN:
-        raise RuntimeError("Missing Turso environment variables")
-    http_url = TURSO_DATABASE_URL.replace("libsql", "https", 1)
-    return libsql_client.create_client_sync(url=http_url, auth_token=TURSO_AUTH_TOKEN)
+    """Return a singleton synchronous Turso client using HTTPS.
+
+    This avoids the overhead of creating a new HTTP connection pool for
+    every DB operation. All functions share the same client instance.
+    """
+    global _CLIENT, _CLIENT_CREATED_AT
+    now = datetime.utcnow()
+    # Recreate client if missing or older than 8 hours
+    if _CLIENT is None or _CLIENT_CREATED_AT is None or now - _CLIENT_CREATED_AT > timedelta(hours=8):
+        if _CLIENT is not None:
+            try:
+                _CLIENT.close()
+            except Exception:
+                pass
+            _CLIENT = None
+        if not TURSO_DATABASE_URL or not TURSO_AUTH_TOKEN:
+            raise RuntimeError("Missing Turso environment variables")
+        http_url = TURSO_DATABASE_URL.replace("libsql", "https", 1)
+        _CLIENT = libsql_client.create_client_sync(url=http_url, auth_token=TURSO_AUTH_TOKEN)
+        _CLIENT_CREATED_AT = now
+        if not TURSO_DATABASE_URL or not TURSO_AUTH_TOKEN:
+            raise RuntimeError("Missing Turso environment variables")
+        http_url = TURSO_DATABASE_URL.replace("libsql", "https", 1)
+        _CLIENT = libsql_client.create_client_sync(url=http_url, auth_token=TURSO_AUTH_TOKEN)
+    return _CLIENT
+
+
+def close_db_connection():
+    """Close the global Turso client (call once on application exit)."""
+    global _CLIENT
+    if _CLIENT is not None:
+        try:
+            _CLIENT.close()
+        finally:
+            _CLIENT = None
 
 
 # --- Helper to convert Turso rows to dictionaries ---
@@ -88,7 +123,7 @@ def init_db(schema_file='schema.sql'):
     except Exception as e:
         print(f"An error occurred during DB initialization: {e}")
     finally:
-        client.close()
+        pass  # keep global client open
 
 
 # --- Các hàm xác thực và quản lý người dùng ---
@@ -125,7 +160,7 @@ def verify_user(username, password):
     except Exception as e:
         print(f"Error during user verification: {e}")
     finally:
-        client.close()
+        pass  # keep global client open
         
     return None
 
@@ -141,7 +176,7 @@ def update_password(username, new_password):
     except Exception as e:
         print(f"Error updating password: {e}")
     finally:
-        client.close()
+        pass  # keep global client open
 
 def update_user_role(username, new_role):
     """Updates the role for a given user."""
@@ -154,7 +189,7 @@ def update_user_role(username, new_role):
     except Exception as e:
         print(f"Error updating user role: {e}")
     finally:
-        client.close()
+        pass  # keep global client open
 
 def create_user(username, password, full_name, role) -> Tuple[bool, str]:
     """
@@ -179,7 +214,7 @@ def create_user(username, password, full_name, role) -> Tuple[bool, str]:
     except Exception as e:
         return (False, f"Đã xảy ra lỗi khi tạo người dùng: {e}")
     finally:
-        conn.close()
+        pass  # keep global client open
 
 def get_all_users():
     """Retrieves a list of all users (without passwords)."""
@@ -191,7 +226,7 @@ def get_all_users():
         print(f"Error getting all users: {e}")
         return []
     finally:
-        client.close()
+        pass  # keep global client open
 
 def search_users(search_term):
     """Searches for users by username or full name."""
@@ -207,7 +242,7 @@ def search_users(search_term):
         print(f"Error searching users: {e}")
         return []
     finally:
-        client.close()
+        pass  # keep global client open
 
 
 # --- Các hàm CRUD cho Hợp đồng ---
@@ -222,7 +257,7 @@ def get_all_sign_cf():
         print(f"Error getting sign cf options: {e}")
         return []
     finally:
-        client.close()
+        pass  # keep global client open
 
 def add_contract(contract_data):
     """Adds a new contract and its related details sequentially."""
@@ -287,7 +322,7 @@ def add_contract(contract_data):
         # NOTE: Cannot roll back changes due to lack of transaction support.
         return False, f"Lỗi khi thêm hợp đồng: {e}"
     finally:
-        client.close()
+        pass  # keep global client open
 
 def get_all_benefit_groups():
     """Retrieves all benefit group options."""
@@ -299,7 +334,7 @@ def get_all_benefit_groups():
         print(f"Error getting benefit groups: {e}")
         return []
     finally:
-        client.close()
+        pass  # keep global client open
 
 def search_contracts(company_name='', contract_number='', benefit_group_ids=None):
     if benefit_group_ids is None:
@@ -358,7 +393,7 @@ def search_contracts(company_name='', contract_number='', benefit_group_ids=None
                 "details": contract_details,
                 # Pass the active connection to helper functions
                 "waiting_periods": get_waiting_periods_for_contract(conn, contract_id),
-                "benefits": get_benefits_for_contract(conn, contract_id),
+                "benefits": get_benefits_for_contract(conn, contract_id, benefit_group_ids),
                 "special_cards": get_special_cards_for_contract(conn, contract_id)
             }
             results.append(contract_data)
@@ -371,7 +406,7 @@ def search_contracts(company_name='', contract_number='', benefit_group_ids=None
         return []
     finally:
         if conn:
-            conn.close() # Ensure the connection is closed
+            pass  # keep global client open # Ensure the connection is closed
 
 # --- Helper functions for contract details (using the passed connection) ---
 
@@ -391,15 +426,27 @@ def get_waiting_periods_for_contract(conn, contract_id):
         print(f"Error fetching waiting periods for contract {contract_id}: {e}")
         return []
 
-def get_benefits_for_contract(conn, contract_id):
+def get_benefits_for_contract(conn, contract_id, benefit_group_ids=None):
     """Trả về list[(ten_quyenloi, han_muc, mo_ta)] để UI hiển thị."""
-    query = """
-        SELECT ten_quyenloi, han_muc, mo_ta
-        FROM quyenloi_chitiet
-        WHERE hopdong_id = ?
-    """
+    # Xây dựng truy vấn động dựa trên danh sách nhóm quyền lợi, nếu có
+    params = [contract_id]
+    if benefit_group_ids:
+        placeholders = ', '.join(['?'] * len(benefit_group_ids))
+        query = f"""
+            SELECT ten_quyenloi, han_muc, mo_ta
+            FROM quyenloi_chitiet
+            WHERE hopdong_id = ?
+              AND nhom_id IN ({placeholders})
+        """
+        params += benefit_group_ids
+    else:
+        query = """
+            SELECT ten_quyenloi, han_muc, mo_ta
+            FROM quyenloi_chitiet
+            WHERE hopdong_id = ?
+        """
     try:
-        rs = conn.execute(query, [contract_id])
+        rs = conn.execute(query, params)
         return [(row[0], row[1], row[2]) for row in rs.rows]
     except Exception as e:
         print(f"Error fetching benefits for contract {contract_id}: {e}")
@@ -426,7 +473,7 @@ def add_benefit(contract_id, benefit_group_id, benefit_name, benefit_limit, bene
     client = get_db_connection()
     try:
         client.execute(
-            """INSERT INTO quyenloi_chitiet (hopdong_id, nhom_id, ten_quyen_loi, gioi_han, mo_ta) 
+            """INSERT INTO quyenloi_chitiet (hopdong_id, nhom_id, ten_quyenloi, han_muc, mo_ta) 
                VALUES (?, ?, ?, ?, ?)""",
             [contract_id, benefit_group_id, benefit_name, benefit_limit, benefit_desc]
         )
@@ -436,7 +483,7 @@ def add_benefit(contract_id, benefit_group_id, benefit_name, benefit_limit, bene
         print(f"Error adding benefit to contract {contract_id}: {e}")
         return False
     finally:
-        client.close()
+        pass  # keep global client open
 
 def get_all_waiting_times():
     """Retrieves all waiting time options."""
@@ -448,7 +495,7 @@ def get_all_waiting_times():
         print(f"Error getting waiting times: {e}")
         return []
     finally:
-        client.close()
+        pass  # keep global client open
 
 def add_waiting_time(loai_cho, mo_ta):
     """Adds a new waiting time definition."""
@@ -463,4 +510,4 @@ def add_waiting_time(loai_cho, mo_ta):
         print(f"Error adding waiting time (might be a duplicate): {e}")
         return False
     finally:
-        client.close()
+        pass  # keep global client open

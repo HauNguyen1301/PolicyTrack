@@ -228,7 +228,7 @@ class AddBenefitFrame(ttk.Frame):
         
         # Update status message
         if enabled and self.current_contract:
-            contract_number = self.current_contract.get('soHopDong', 'N/A')
+            contract_number = self.current_contract['details'].get('soHopDong', 'N/A')
             self.status_label.config(
                 text=f"Đang thêm quyền lợi cho hợp đồng: {contract_number}",
                 style="Success.TLabel"
@@ -253,8 +253,11 @@ class AddBenefitFrame(ttk.Frame):
             return
 
         try:
-            # Use the new unified search function. It searches both fields.
-            results = db.search_contracts(company_name=search_term, contract_number=search_term)
+            # Tìm theo tên công ty trước
+            results = db.search_contracts(company_name=search_term, contract_number='')
+            # Nếu không thấy, thử tìm theo số hợp đồng
+            if not results:
+                results = db.search_contracts(company_name='', contract_number=search_term)
             
             # Clear previous results from tree and data store
             for item in self.tree.get_children():
@@ -357,6 +360,7 @@ class AddBenefitFrame(ttk.Frame):
             row += 1
             
             # Contract details
+            contract_details = self.current_contract['details']
             ttk.Label(
                 self.contract_info_frame,
                 text="Số HD:",
@@ -364,7 +368,7 @@ class AddBenefitFrame(ttk.Frame):
             ).grid(row=row, column=0, sticky="e", padx=5, pady=2)
             ttk.Label(
                 self.contract_info_frame,
-                text=self.current_contract["soHopDong"],
+                text=contract_details["soHopDong"],
                 font=("Arial", 9)
             ).grid(row=row, column=1, sticky="w", padx=5, pady=2)
             row += 1
@@ -376,15 +380,15 @@ class AddBenefitFrame(ttk.Frame):
             ).grid(row=row, column=0, sticky="e", padx=5, pady=2)
             ttk.Label(
                 self.contract_info_frame,
-                text=self.current_contract["tenCongTy"],
+                text=contract_details["tenCongTy"],
                 font=("Arial", 9),
                 wraplength=250
             ).grid(row=row, column=1, sticky="w", padx=5, pady=2)
             row += 1
             
             # Định dạng ngày hiệu lực hợp đồng
-            from_date = self.current_contract.get('HLBH_tu')
-            to_date = self.current_contract.get('HLBH_den')
+            from_date = contract_details.get('HLBH_tu')
+            to_date = contract_details.get('HLBH_den')
             date_range = format_date_range(from_date, to_date)
 
                 

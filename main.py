@@ -1,6 +1,10 @@
 import sys
 import asyncio
 
+# Ensure compatible event loop on Windows when running frozen without start.py
+if sys.platform == "win32":
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+
 
 
 import tkinter as tk
@@ -13,11 +17,11 @@ import database
 class App(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("PolicyTrack v0.1")
+        self.title("PolicyTrack v0.1.2")
         self.geometry("1000x800")
         
-        # Khởi tạo DB nếu chưa có
-        database.init_db()
+        # DB schema được quản lý sẵn trên Turso, không cần khởi tạo tại client
+        # database.init_db()
 
 
         self.current_user = None

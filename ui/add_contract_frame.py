@@ -165,7 +165,11 @@ class AddContractFrame(ttk.Frame):
                 if cho_id:
                     waiting_times.append((cho_id, value))
         unique_waiting_times = dict(waiting_times)
-        contract_data['waiting_times'] = list(unique_waiting_times.items())
+        # Convert waiting times to the format expected by the database layer
+        contract_data['waiting_periods'] = [
+            {"id": cho_id, "value": val}
+            for cho_id, val in unique_waiting_times.items()
+        ]
 
         # --- Thu thập dữ liệu thẻ đặc biệt ---
         special_cards = []
@@ -187,9 +191,9 @@ class AddContractFrame(ttk.Frame):
 
             if so_the and ten_ndbh:  # Chỉ thêm nếu người dùng nhập ít nhất 2 trường chính
                 special_cards.append({
-                    'so_the': so_the,
-                    'ten_NDBH': ten_ndbh,
-                    'ghi_chu': ghi_chu
+                    "number": so_the,
+                    "holder_name": ten_ndbh,
+                    "notes": ghi_chu
                 })
         contract_data['special_cards'] = special_cards
 
