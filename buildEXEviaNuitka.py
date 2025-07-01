@@ -27,9 +27,12 @@ import sys
 from pathlib import Path
 from typing import List
 
+from policytrack_version import __version__
+
 PROJECT_ROOT = Path(__file__).resolve().parent
 ENTRY_SCRIPT = PROJECT_ROOT / "main.py"
-DEFAULT_EXE_NAME = "PolicyTrack v0.1.2"
+# Use version string for output exe name (spaces removed for compatibility)
+DEFAULT_EXE_NAME = f"PolicyTrack_{__version__}"
 
 
 def run(cmd: List[str]):
@@ -45,7 +48,8 @@ def main():
     """Compile the app into a single-file EXE using Nuitka with sensible defaults."""
 
     parser = argparse.ArgumentParser(description="Build PolicyTrack with Nuitka")
-    parser.add_argument("--output", default=DEFAULT_EXE_NAME, help="Executable base name (default: PolicyTrack)")
+    parser.add_argument("--output", default=DEFAULT_EXE_NAME,
+                    help=f"Executable base name (default: {DEFAULT_EXE_NAME})")
     parser.add_argument("--noconsole", action="store_true", help="Hide the console window (GUI app)")
     args = parser.parse_args()
 

@@ -20,22 +20,36 @@ from packaging.version import parse as _vparse
 from policytrack_version import __version__
 
 # URL tới file JSON chứa thông tin phiên bản mới nhất
-UPDATE_URL = "https://raw.githubusercontent.com/<user>/PolicyTrack/main/updates/latest.json"
+UPDATE_URL = (
+    "https://raw.githubusercontent.com/"
+    "HauNguyen1301/PolicyTrack/main/updates/latest.json"
+)
 
 def _check_for_update(parent):
     """Chạy ở luồng nền; nếu có version mới thì thông báo."""
     try:
         resp = requests.get(UPDATE_URL, timeout=3)
+        if __debug__:
+            print("[UpdateCheck] HTTP status:", resp.status_code)
         data = resp.json()
         remote_ver = data.get("version", "")
+        if __debug__:
+            print(f"[UpdateCheck] Local {__version__} / Remote {remote_ver}")
         if remote_ver and _vparse(remote_ver) > _vparse(__version__):
-            notes = data.get("notes", "")
+            raw_notes = data.get("notes", "")
+            if isinstance(raw_notes, list):
+                notes = "\n".join(f"- {line}" for line in raw_notes)
+            else:
+                notes = str(raw_notes)
             parent.after(0, lambda: messagebox.showinfo(
                 "Có phiên bản mới",
                 f"Version {remote_ver} đã sẵn sàng!\n\n{notes}",
                 parent=parent
             ))
-    except Exception:
+    except Exception as e:
+        if __debug__:
+            print('[UpdateCheck] Error:', e)
+
         # Im lặng nếu không thể kiểm tra (offline, lỗi JSON, v.v.)
         pass
 
@@ -43,8 +57,11 @@ def _check_for_update(parent):
 class App(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("PolicyTrack v0.1.2")
+        self.title(f"PolicyTrack {__version__}")
         self.geometry("1000x800")
+
+        # Để sau khi đăng nhập mới kiểm tra phiên bản → tránh hộp thoại che màn hình login
+        self._update_thread_started = False
         
         # DB schema được quản lý sẵn trên Turso, không cần khởi tạo tại client
         # database.init_db()
@@ -101,6 +118,12 @@ class App(tk.Tk):
         main_frame.update_button_states_by_role(user['role'])
         
         self.show_frame("MainApplicationFrame")
+
+        # Chỉ khởi chạy kiểm tra phiên bản một lần sau khi đăng nhập đầu tiên
+        if not getattr(self, "_update_thread_started", False):
+            threading.Thread(target=_check_for_update, args=(self,), daemon=True).start()
+            self._update_thread_started = True
+        
 
     def logout(self):
         """Xử lý đăng xuất, quay về màn hình Login."""
