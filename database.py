@@ -413,7 +413,7 @@ def search_contracts(company_name='', contract_number='', benefit_group_ids=None
 def get_waiting_periods_for_contract(conn, contract_id):
     """Trả về list[(loai_cho, gia_tri)] để UI hiển thị 'loai_cho: gia_tri'."""
     query = """
-        SELECT tgc.loai_cho, tgc.mo_ta
+        SELECT tgc.loai_cho, hqc.gia_tri
         FROM hopdong_quydinh_cho hqc
         JOIN thoi_gian_cho tgc ON hqc.cho_id = tgc.id
         WHERE hqc.hopdong_id = ?

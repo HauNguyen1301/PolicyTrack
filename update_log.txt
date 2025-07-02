@@ -11,3 +11,8 @@ Update Log - PolicyTrack
 --------------------------------
 1. Thêm kiểm tra version (main.py).
 
+2025-07-02 16:05:38  |  v0.1.1
+--------------------------------
+1. Update using database online.
+2. Done UserPanel; Done Add Contract Panel.
+

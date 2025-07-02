@@ -4,7 +4,17 @@ import database as db
 import datetime  # TODO: Remove if no longer used elsewhere
 from utils.date_utils import format_date, format_date_range
 
+# ====== Feature Disabled Stub ======
 class AddBenefitFrame(ttk.Frame):
+    """Stub class because 'Thêm Quyền Lợi' feature is temporarily disabled."""
+    def __init__(self, parent, controller):
+        super().__init__(parent)
+        ttk.Label(self, text="Chức năng 'Thêm Quyền Lợi' đang phát triển.", font=("Arial", 12, "italic")).pack(expand=True)
+
+# ------------------------------------
+
+
+class _AddBenefitFrameOriginal(ttk.Frame):
     def __init__(self, parent, controller):
         super().__init__(parent)
         self.controller = controller
