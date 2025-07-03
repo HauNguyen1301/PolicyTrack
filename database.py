@@ -3,11 +3,13 @@ from typing import Any, Dict, List, Tuple
 import bcrypt
 import re
 import libsql_client
+from dotenv import load_dotenv
 
 # --- Load Environment Variables for Turso ---
+load_dotenv()  # Load environment variables from a .env file if present
 
-TURSO_DATABASE_URL = "libsql://policytrack-huuhaubaoviet.aws-ap-northeast-1.turso.io"
-TURSO_AUTH_TOKEN = "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3NTEyNTc1NjIsImlkIjoiMjYwNmMwZmQtNzQ4YS00YTQzLWE3ZjItY2JlODFmNDBlNGYyIiwicmlkIjoiYmU1MDQxZjItODQwZi00OWQ3LTk4NzEtY2VlNDViMThmOTZmIn0.xzbYZVdsvQgd2ZBC4Ac_KYRxzCFREl8ktQS9inwwFWKpw8Ca-paj_VyY_R4Ygv01h5Or4THUBLyIsK_BzQSmDA"
+TURSO_DATABASE_URL = os.getenv("TURSO_DATABASE_URL", "")
+TURSO_AUTH_TOKEN = os.getenv("TURSO_AUTH_TOKEN", "")
 # --- Turso Connection Helper (singleton) ---
 from typing import Optional
 from datetime import datetime, timedelta
@@ -263,8 +265,8 @@ def add_contract(contract_data):
         rs = client.execute(
             """
             INSERT INTO hopdong_baohiem (
-                soHopDong, tenCongTy, HLBH_tu, HLBH_den, coPay, sign_CF_id, mr_app
-            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                soHopDong, tenCongTy, HLBH_tu, HLBH_den, coPay, sign_CF_id, created_by, mr_app
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
             [
                 contract_data['soHopDong'],
@@ -273,6 +275,7 @@ def add_contract(contract_data):
                 contract_data['HLBH_den'],
                 contract_data['coPay'],
                 contract_data['sign_CF_id'],
+                contract_data.get('created_by'),
                 contract_data['mr_app']
             ]
         )
@@ -292,15 +295,16 @@ def add_contract(contract_data):
         for benefit in contract_data.get('benefits', []):
             client.execute(
                 """
-                INSERT INTO quyenloi_chitiet (hopdong_id, nhom_id, ten_quyenloi, han_muc, mo_ta) 
-                VALUES (?, ?, ?, ?, ?)
+                INSERT INTO quyenloi_chitiet (hopdong_id, nhom_id, ten_quyenloi, han_muc, mo_ta, isActive, created_at) 
+                 VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
                 """,
                 [
                     contract_id,
                     benefit['group_id'],
                     benefit['name'],
                     benefit['limit'],
-                    benefit['description']
+                    benefit['description'],
+                    1  # isActive default
                 ]
             )
 
@@ -468,14 +472,24 @@ def get_special_cards_for_contract(conn, contract_id):
         print(f"Error fetching special cards for contract {contract_id}: {e}")
         return []
 
-def add_benefit(contract_id, benefit_group_id, benefit_name, benefit_limit, benefit_desc):
-    """Adds a single benefit to a contract."""
+def add_benefit(contract_id, benefit_group_id, benefit_name, benefit_limit, benefit_desc, created_by: int | None = None, is_active: int = 1):
+    """Adds a single benefit to a contract.
+
+    Args:
+        contract_id: ID of the contract.
+        benefit_group_id: Benefit group ID.
+        benefit_name: Name of the benefit.
+        benefit_limit: Limit value.
+        benefit_desc: Description.
+        created_by: ID of the user performing the insert.
+        is_active: 1 (default) or 0.
+    """
     client = get_db_connection()
     try:
         client.execute(
-            """INSERT INTO quyenloi_chitiet (hopdong_id, nhom_id, ten_quyenloi, han_muc, mo_ta) 
-               VALUES (?, ?, ?, ?, ?)""",
-            [contract_id, benefit_group_id, benefit_name, benefit_limit, benefit_desc]
+            """INSERT INTO quyenloi_chitiet (hopdong_id, nhom_id, ten_quyenloi, han_muc, mo_ta, created_by, isActive, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)""",
+            [contract_id, benefit_group_id, benefit_name, benefit_limit, benefit_desc, created_by, is_active]
         )
         print(f"Successfully added benefit '{benefit_name}' to contract {contract_id}.")
         return True

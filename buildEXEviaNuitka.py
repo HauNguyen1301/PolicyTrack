@@ -75,6 +75,7 @@ def main():
         "--include-module=libsql_client",
         "--include-data-files=utils/*=utils/",
         "--include-data-files=ui/*=ui/",
+        "--include-data-files=.env=./",
         f"--output-filename={output_name}",
         "--nofollow-import-to=tests,__pycache__",
         "--no-pyi-file",
@@ -99,6 +100,11 @@ def main():
     if exe_src.exists():
         shutil.move(str(exe_src), dest_exe)
         print(f"Moved {exe_name} -> dist/{exe_name}")
+    # Also copy .env into the dist folder so the executable can load environment variables at runtime
+    env_src = PROJECT_ROOT / ".env"
+    if env_src.exists():
+        shutil.copy(env_src, dist_dir / ".env")
+        print("Copied .env -> dist/.env")
 
     # Clean up any build artifacts to leave only the dist folder with the final exe
     for path in PROJECT_ROOT.iterdir():
