@@ -472,7 +472,7 @@ def get_special_cards_for_contract(conn, contract_id):
         print(f"Error fetching special cards for contract {contract_id}: {e}")
         return []
 
-def add_benefit(contract_id, benefit_group_id, benefit_name, benefit_limit, benefit_desc, created_by: int | None = None, is_active: int = 1):
+def add_benefit(contract_id, benefit_group_id, benefit_name, benefit_limit, benefit_desc, created_by: Optional[int] = None, is_active: int = 1):
     """Adds a single benefit to a contract.
 
     Args:
