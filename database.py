@@ -3,6 +3,10 @@ from typing import Any, Dict, List, Tuple
 import bcrypt
 import re
 import libsql_client
+import certifi
+# Use certifi's CA bundle when system store may be missing
+os.environ.setdefault("SSL_CERT_FILE", certifi.where())
+os.environ.setdefault("REQUESTS_CA_BUNDLE", certifi.where())
 from dotenv import load_dotenv
 
 # --- Load Environment Variables for Turso ---

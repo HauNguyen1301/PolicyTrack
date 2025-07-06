@@ -28,11 +28,12 @@ from pathlib import Path
 from typing import List
 
 from policytrack_version import __version__
+import certifi
 
 PROJECT_ROOT = Path(__file__).resolve().parent
 ENTRY_SCRIPT = PROJECT_ROOT / "main.py"
 # Use version string for output exe name (spaces removed for compatibility)
-DEFAULT_EXE_NAME = f"PolicyTrack_{__version__}"
+DEFAULT_EXE_NAME = f"PolicyTrack"
 
 
 def run(cmd: List[str]):
@@ -61,6 +62,26 @@ def main():
         print(f"Removing {build_dir} …")
         shutil.rmtree(build_dir, ignore_errors=True)
 
+    # ---------- Embed .env into an internal module so secrets are baked into the executable ----------
+    generated_env_module = None
+    env_file = PROJECT_ROOT / ".env"
+    if env_file.exists():
+        generated_env_module = PROJECT_ROOT / "internal_env.py"
+        with generated_env_module.open("w", encoding="utf-8") as f:
+            f.write("# Auto-generated. Do NOT commit to VCS. Embeds .env variables at build time.\n")
+            f.write("import os\n")
+            for raw_line in env_file.read_text(encoding='utf-8').splitlines():
+                line = raw_line.strip()
+                if not line or line.startswith('#') or '=' not in line:
+                    continue
+                key, val = line.split('=', 1)
+                key = key.strip()
+                # Remove optional surrounding quotes to prevent escaped backslash before first char
+                if (val.startswith('"') and val.endswith('"')) or (val.startswith("'") and val.endswith("'")):
+                    val = val[1:-1]
+                val = val.replace('\\', r'\\').replace('"', r'\\"')
+                f.write(f'os.environ.setdefault("{key}", "{val}")\n')
+
     nuitka_opts = [
         "-m",
         "nuitka",
@@ -73,9 +94,11 @@ def main():
         "--include-module=bcrypt",
         "--include-module=bcrypt._bcrypt",
         "--include-module=libsql_client",
+        "--include-module=certifi",
+        f"--include-data-files={certifi.where()}=certifi/cacert.pem",
         "--include-data-files=utils/*=utils/",
         "--include-data-files=ui/*=ui/",
-        "--include-data-files=.env=./",
+        "--include-module=internal_env",
         f"--output-filename={output_name}",
         "--nofollow-import-to=tests,__pycache__",
         "--no-pyi-file",
@@ -91,20 +114,18 @@ def main():
     # Move the generated exe into our own dist folder for easy pickup
     exe_name = f"{output_name}.exe"
     exe_src = PROJECT_ROOT / exe_name
-    dist_dir = PROJECT_ROOT / "dist"
-    dist_dir.mkdir(exist_ok=True)
-    dest_exe = dist_dir / exe_name
+    release_dir = PROJECT_ROOT / "release"
+    release_dir.mkdir(exist_ok=True)
+    dest_exe = release_dir / exe_name
     # Replace old exe if it exists
     if dest_exe.exists():
         dest_exe.unlink(missing_ok=True)
     if exe_src.exists():
         shutil.move(str(exe_src), dest_exe)
-        print(f"Moved {exe_name} -> dist/{exe_name}")
-    # Also copy .env into the dist folder so the executable can load environment variables at runtime
-    env_src = PROJECT_ROOT / ".env"
-    if env_src.exists():
-        shutil.copy(env_src, dist_dir / ".env")
-        print("Copied .env -> dist/.env")
+        print(f"Moved {exe_name} -> release/{exe_name}")
+    # Remove the generated internal_env.py file after building
+    if 'generated_env_module' in locals() and generated_env_module and generated_env_module.exists():
+        generated_env_module.unlink(missing_ok=True)
 
     # Clean up any build artifacts to leave only the dist folder with the final exe
     for path in PROJECT_ROOT.iterdir():
@@ -122,7 +143,7 @@ def main():
             print(f"Cleaning build artifact: {path}")
             shutil.rmtree(path, ignore_errors=True)
 
-    print("\n✅ Build completed! Find your executable in the 'dist' directory.")
+    print("\n✅ Build completed! Find your executable in the 'release' directory. ✅")
 
 
 if __name__ == "__main__":

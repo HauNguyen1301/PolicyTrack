@@ -1,6 +1,7 @@
 import tkinter as tk
-from tkinter import ttk, messagebox
-from datetime import datetime
+import ttkbootstrap as ttk
+from ttkbootstrap.dialogs import Messagebox
+from datetime import datetime   
 import database
 from utils.date_utils import format_date
 
@@ -11,10 +12,19 @@ class CheckContractPanel(ttk.Frame):
         super().__init__(parent, padding="10")
         self.controller = controller # Lưu lại controller
 
+        # Title
+        title_label = ttk.Label(
+            self, 
+            text="TÌM KIẾM THÔNG TIN HỢP ĐỒNG", 
+            style="Title.TLabel",
+            font=("Arial", 14, "bold")
+        )
+        title_label.pack(pady=(10, 20))
+
         self.benefit_vars = {} # Dictionary để lưu {group_id: BooleanVar}
 
         # --- Khung tìm kiếm ---
-        search_frame = ttk.LabelFrame(self, text="Tiêu chí tìm kiếm", padding="10")
+        search_frame = ttk.LabelFrame(self, text="Tiêu chí tìm kiếm", padding="10", bootstyle="info")
         search_frame.pack(fill='x', pady=5, padx=5)
 
         # Dòng 1: Tên công ty và Số HĐ
@@ -40,7 +50,7 @@ class CheckContractPanel(ttk.Frame):
             var = tk.BooleanVar()
             self.benefit_vars[group_id] = var
             
-            cb = ttk.Checkbutton(checkbox_frame, text=group_name, variable=var)
+            cb = ttk.Checkbutton(checkbox_frame, text=group_name, variable=var, bootstyle="info")
             row_num = i // num_columns
             col_num = i % num_columns
             cb.grid(row=row_num, column=col_num, padx=5, pady=2, sticky='w')
@@ -48,14 +58,14 @@ class CheckContractPanel(ttk.Frame):
         # Nút tìm kiếm
         search_button_frame = ttk.Frame(search_frame)
         search_button_frame.grid(row=2, column=0, columnspan=4, pady=10, sticky='e')
-        search_button = ttk.Button(search_button_frame, text="Tìm kiếm", command=self.perform_search, style="Accent.TButton")
+        search_button = ttk.Button(search_button_frame, text="Tìm kiếm",bootstyle="outline-info", command=self.perform_search)
         search_button.pack()
 
         search_frame.columnconfigure(1, weight=1)
         search_frame.columnconfigure(3, weight=1)
 
         # --- Khung kết quả (Text Area) ---
-        result_frame = ttk.LabelFrame(self, text="Kết quả tìm kiếm", padding="10")
+        result_frame = ttk.LabelFrame(self, text="Kết quả tìm kiếm", padding="10", bootstyle="info")
         result_frame.pack(expand=True, fill='both', pady=(10, 5), padx=5)
 
         self.result_text = tk.Text(result_frame, wrap='word', height=15, font=("Segoe UI", 10))

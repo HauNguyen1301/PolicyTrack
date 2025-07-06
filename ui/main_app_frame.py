@@ -1,5 +1,6 @@
 import tkinter as tk
-from tkinter import ttk, messagebox
+import ttkbootstrap as ttk
+from tkinter import messagebox
 import database
 from .admin_features_frame import AdminFeaturesFrame
 from .add_contract_frame import AddContractFrame
@@ -13,34 +14,13 @@ class MainApplicationFrame(ttk.Frame):
         self.admin_features = AdminFeaturesFrame(self.controller)
         self.frames = {}
 
-        self._setup_styles()
         self._create_widgets()
         self._initialize_content_frames()
         self.update_button_states_by_role(None) # Đặt trạng thái ban đầu
 
-    def _setup_styles(self):
-        style = ttk.Style()
-        style.configure('Header.TButton', font=('Segoe UI', 10), padding=(10, 5))
-        style.map('Header.TButton',
-            background=[('active', '#e0e0e0')],
-            foreground=[('active', 'black')]
-        )
-        style.configure("Main.TButton", font=("Segoe UI", 12, 'bold'), padding=10)
-        style.map('Main.TButton', foreground=[('active', 'blue')], background=[('active', '#f0f0f0')])
-        style.configure("Accent.TButton", 
-                      font=("Segoe UI", 10, 'bold'), 
-                      padding=10, 
-                      background='#FF4444',  # Red background
-                      foreground='red')      # Red text
-        style.map('Accent.TButton', 
-            background=[('active', '#FF6666'), ('pressed', '#FF2222')],  # Lighter/darker red on hover/press
-            foreground=[('active', 'red'), ('pressed', 'red')]  # Keep text red on all states
-        )
-        style.configure("Title.TLabel", font=("Segoe UI", 16, "bold"))
-
     def _create_widgets(self):
         # --- Thanh công cụ trên cùng ---
-        top_bar = ttk.Frame(self, padding=(10, 5), relief='raised', borderwidth=1)
+        top_bar = ttk.Frame(self, padding=(10, 5))
         top_bar.pack(side='top', fill='x')
 
         self.welcome_label = ttk.Label(top_bar, text="Chào mừng!", font=("Segoe UI", 12, "bold"))
@@ -49,11 +29,11 @@ class MainApplicationFrame(ttk.Frame):
         buttons_right_frame = ttk.Frame(top_bar)
         buttons_right_frame.pack(side='right', padx=5)
 
-        self.manage_users_button = ttk.Button(buttons_right_frame, text="Quản lý User", command=self.admin_features.show_manage_users_popup, style='Header.TButton')
-        self.create_user_button = ttk.Button(buttons_right_frame, text="Tạo User Mới", command=self.admin_features.show_create_user_popup, style='Header.TButton')
-        self.change_password_button = ttk.Button(buttons_right_frame, text="Đổi Mật Khẩu", command=self.change_password_popup, style='Header.TButton')
+        self.manage_users_button = ttk.Button(buttons_right_frame, text="Quản lý User", command=self.admin_features.show_manage_users_popup, bootstyle="secondary-outline")
+        self.create_user_button = ttk.Button(buttons_right_frame, text="Tạo User Mới", command=self.admin_features.show_create_user_popup, bootstyle="secondary-outline")
+        self.change_password_button = ttk.Button(buttons_right_frame, text="Đổi Mật Khẩu", command=self.change_password_popup, bootstyle="secondary-outline")
         self.change_password_button.pack(side='left', padx=5)
-        ttk.Button(buttons_right_frame, text="Đăng xuất", command=lambda: self.controller.logout(), style='Header.TButton').pack(side='left', padx=5)
+        ttk.Button(buttons_right_frame, text="Đăng xuất", command=lambda: self.controller.logout(), bootstyle="danger").pack(side='left', padx=5)
 
         # --- Khu vực nội dung chính ---
         main_content_area = ttk.Frame(self, padding="10")
@@ -63,10 +43,10 @@ class MainApplicationFrame(ttk.Frame):
         button_panel = ttk.Frame(main_content_area)
         button_panel.pack(fill='x', side='top', pady=(0, 10))
 
-        self.check_contract_button = ttk.Button(button_panel, text="Kiểm tra Hợp đồng", style="Main.TButton", command=lambda: self.show_content_panel('CheckContractPanel'))
-        self.add_contract_button = ttk.Button(button_panel, text="Thêm Hợp đồng mới", style="Main.TButton", command=lambda: self.show_content_panel('AddContractFrame'))
-        self.add_benefit_button = ttk.Button(button_panel, text="Thêm Quyền Lợi", style="Main.TButton", command=lambda: self.show_content_panel('AddBenefitFrame'))
-        self.edit_contract_button = ttk.Button(button_panel, text="Chỉnh sửa Hợp đồng", style="Main.TButton", command=lambda: self.show_content_panel("edit")) # 'edit' chưa có frame
+        self.check_contract_button = ttk.Button(button_panel, text="Kiểm tra Hợp đồng", bootstyle="primary-outline", command=lambda: self.show_content_panel('CheckContractPanel'))
+        self.add_contract_button = ttk.Button(button_panel, text="Thêm Hợp đồng mới", bootstyle="success-outline", command=lambda: self.show_content_panel('AddContractFrame'))
+        self.add_benefit_button = ttk.Button(button_panel, text="Thêm Quyền Lợi", bootstyle="info-outline", command=lambda: self.show_content_panel('AddBenefitFrame'))
+        self.edit_contract_button = ttk.Button(button_panel, text="Chỉnh sửa Hợp đồng", bootstyle="warning-outline", command=lambda: self.show_content_panel("edit")) # 'edit' chưa có frame
         
         self.check_contract_button.pack(side='left', expand=True, fill='x', padx=5)
         self.add_contract_button.pack(side='left', expand=True, fill='x', padx=5)
@@ -112,7 +92,7 @@ class MainApplicationFrame(ttk.Frame):
         self.create_user_button.pack_forget()
 
     def change_password_popup(self):
-        popup = tk.Toplevel(self.controller)
+        popup = ttk.Toplevel(self.controller)
         popup.title("Đổi Mật Khẩu")
         popup.geometry("400x250")
         popup.transient(self.controller)
@@ -159,30 +139,37 @@ class MainApplicationFrame(ttk.Frame):
 
         button_frame = ttk.Frame(frame)
         button_frame.grid(row=3, columnspan=2, pady=20)
-        ttk.Button(button_frame, text="Xác nhận", command=submit).pack(side="left", padx=10)
-        ttk.Button(button_frame, text="Hủy", command=popup.destroy).pack(side="left")
+        ttk.Button(button_frame, text="Xác nhận", command=submit, bootstyle="success").pack(side="left", padx=10)
+        ttk.Button(button_frame, text="Hủy", command=popup.destroy, bootstyle="secondary").pack(side="left")
 
     def update_button_states_by_role(self, role):
         role_lower = role.lower() if role else None
         if role_lower == 'admin':
-            self.check_contract_button.config(state='normal')
-            self.add_contract_button.config(state='normal')
-            self.edit_contract_button.config(state='normal')
+            for btn in (self.check_contract_button,
+                         self.add_contract_button,
+                         self.add_benefit_button,
+                         self.edit_contract_button):
+                btn.config(state='normal')
             self.show_admin_features()
         elif role_lower == 'creator':
-            self.check_contract_button.config(state='normal')
-            self.add_contract_button.config(state='normal')
-            self.edit_contract_button.config(state='normal')
+            for btn in (self.check_contract_button,
+                         self.add_contract_button,
+                         self.add_benefit_button,
+                         self.edit_contract_button):
+                btn.config(state='normal')
             self.hide_admin_features()
         elif role_lower == 'viewer':
             self.check_contract_button.config(state='normal')
             self.add_contract_button.config(state='disabled')
+            self.add_benefit_button.config(state='disabled')
             self.edit_contract_button.config(state='disabled')
             self.hide_admin_features()
         else:
-            self.check_contract_button.config(state='disabled')
-            self.add_contract_button.config(state='disabled')
-            self.edit_contract_button.config(state='disabled')
+            for btn in (self.check_contract_button,
+                         self.add_contract_button,
+                         self.add_benefit_button,
+                         self.edit_contract_button):
+                btn.config(state='disabled')
             self.hide_admin_features()
 
     def reset_to_default_state(self):

@@ -8,6 +8,10 @@ import os
 from typing import Any, Dict, List, Tuple
 
 import bcrypt
+import certifi
+# Ensure Python & OpenSSL use bundled certifi root store when system store is missing
+os.environ.setdefault("SSL_CERT_FILE", certifi.where())
+os.environ.setdefault("REQUESTS_CA_BUNDLE", certifi.where())
 from dotenv import load_dotenv
 import libsql_client
 

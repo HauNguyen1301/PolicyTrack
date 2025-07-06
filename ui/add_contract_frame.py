@@ -1,5 +1,6 @@
 import tkinter as tk
-from tkinter import ttk, messagebox
+import ttkbootstrap as ttk
+from ttkbootstrap.dialogs import Messagebox
 import database
 from utils.date_utils import _to_date
 class AddContractFrame(ttk.Frame):
@@ -13,6 +14,15 @@ class AddContractFrame(ttk.Frame):
 
     def create_widgets(self):
         """Tạo các widget cho giao diện thêm hợp đồng."""
+        # --- Tiêu đề ---
+        title_label = ttk.Label(
+            self, 
+            text="\nTHÊM HỢP ĐỒNG BẢO HIỂM MỚI", 
+            style="Title.TLabel",
+            font=("Arial", 14, "bold")
+        )
+        title_label.pack(pady=(0, 20))
+
         # Container chính, sử dụng grid để chia thành 2 cột bằng nhau
         container = ttk.Frame(self, padding="10")  # Giảm padding tổng
         container.pack(expand=True, fill="both")
@@ -21,19 +31,15 @@ class AddContractFrame(ttk.Frame):
         container.grid_columnconfigure(1, weight=1, minsize=400)  # Thêm minsize
         container.grid_rowconfigure(1, weight=1)  # Hàng chứa 2 panel
 
-        # --- Tiêu đề ---
-        title_label = ttk.Label(container, text="Thêm Hợp Đồng Bảo Hiểm Mới", style="Title.TLabel")
-        title_label.grid(row=0, column=0, columnspan=2, pady=(0, 20))
-
         # --- Panel bên trái ---
         left_panel = ttk.Frame(container)
         left_panel.grid(row=1, column=0, sticky="nsew", padx=(0, 5))
         left_panel.columnconfigure(0, weight=1)
         left_panel.rowconfigure(0, weight=0)  # Panel thông tin
-        left_panel.rowconfigure(1, weight=1)  # Panel thẻ đặc biệt
+        left_panel.rowconfigure(1, weight=0)  # Panel thẻ đặc biệt
 
         # --- Panel thông tin chung (trên) ---
-        top_left_panel = ttk.LabelFrame(left_panel, text="Thông tin Hợp đồng", padding=(10, 10, 10, 5))  # Giảm padding dưới
+        top_left_panel = ttk.LabelFrame(left_panel, text="Thông tin Hợp đồng", bootstyle="info", padding=(10, 10, 10, 5))  # Giảm padding dưới
         top_left_panel.grid(row=0, column=0, sticky="nsew")
         top_left_panel.columnconfigure(1, weight=1, minsize=200)  # Thêm minsize cho cột nhập liệu
 
@@ -44,7 +50,7 @@ class AddContractFrame(ttk.Frame):
             "HLBH_tu": ("Hiệu lực từ (DD/MM/YYYY):", ttk.Entry(top_left_panel)),
             "HLBH_den": ("Hiệu lực đến (DD/MM/YYYY):", ttk.Entry(top_left_panel)),
             "coPay": ("Đồng chi trả (%):", ttk.Entry(top_left_panel)),
-            "sign_CF": ("Sign CF:", ttk.Combobox(top_left_panel, state="readonly"))
+            "sign_CF": ("Đóng dấu trên CF:", ttk.Combobox(top_left_panel, state="readonly"))
         }
 
         # Lấy dữ liệu cho Sign CF Combobox
@@ -56,8 +62,8 @@ class AddContractFrame(ttk.Frame):
             widget.grid(row=i, column=1, sticky="ew", pady=2, padx=2)
 
         # --- Panel Thẻ Đặc Biệt (dưới) ---
-        bottom_left_panel = ttk.LabelFrame(left_panel, text="Thẻ Đặc Biệt", padding=10)
-        bottom_left_panel.grid(row=1, column=0, sticky="nsew")
+        bottom_left_panel = ttk.LabelFrame(left_panel, text="Thẻ Đặc Biệt",bootstyle="info", padding=10)
+        bottom_left_panel.grid(row=1, column=0, sticky="nsew", pady=(10, 0))
         bottom_left_panel.columnconfigure(0, weight=1)
         bottom_left_panel.rowconfigure(0, weight=1)
 
@@ -71,11 +77,11 @@ class AddContractFrame(ttk.Frame):
         right_panel = ttk.Frame(container)
         right_panel.grid(row=1, column=1, sticky="nsew", padx=(5, 0))
         right_panel.columnconfigure(0, weight=1)
-        right_panel.rowconfigure(0, weight=1)  # Phần thời gian chờ
-        right_panel.rowconfigure(1, weight=1)  # Phần MR App
+        right_panel.rowconfigure(0, weight=0)  # Phần thời gian chờ
+        right_panel.rowconfigure(1, weight=0)  # Phần MR App
 
         # --- Panel Thời gian chờ (trên) ---
-        waiting_time_panel = ttk.LabelFrame(right_panel, text="Quy Định Thời Gian Chờ", padding=(10, 10, 10, 5))
+        waiting_time_panel = ttk.LabelFrame(right_panel, text="Quy Định Thời Gian Chờ", bootstyle="info",padding=(10, 10, 10, 5))
         waiting_time_panel.grid(row=0, column=0, sticky="nsew", pady=(0, 5))
         waiting_time_panel.columnconfigure(0, weight=1)
         waiting_time_panel.rowconfigure(1, weight=1)  # Dynamic rows frame
@@ -89,24 +95,33 @@ class AddContractFrame(ttk.Frame):
         self.dynamic_rows_frame.columnconfigure(0, weight=1)
 
         # --- Panel MR App (dưới) ---
-        mr_app_panel = ttk.LabelFrame(right_panel, text="Mở Rộng Bồi Thường Qua App", padding=(10, 10, 10, 5))
+        mr_app_panel = ttk.LabelFrame(right_panel, text="Mở Rộng Bồi Thường Qua App", bootstyle="info", padding=(10, 10, 10, 5))
         mr_app_panel.grid(row=1, column=0, sticky="nsew", pady=(5, 0))
         mr_app_panel.columnconfigure(1, weight=1)
-        
-        # Tạo biến lưu trạng thái radio button
-        self.mr_app_var = tk.StringVar(value="Không")
-        
-        # Label và Radio buttons
-        ttk.Label(mr_app_panel, text="Mở rộng bồi thường qua app Bvdirect:").grid(row=0, column=0, columnspan=3, sticky="w", pady=(0, 5))
-        
-        ttk.Radiobutton(mr_app_panel, text="Có", variable=self.mr_app_var, value="Có").grid(row=1, column=0, sticky="w", padx=5)
-        ttk.Radiobutton(mr_app_panel, text="Không", variable=self.mr_app_var, value="Không").grid(row=1, column=1, sticky="w")
-        
-        # Ô nhập thông tin chi tiết
-        ttk.Label(mr_app_panel, text="Thông tin chi tiết:").grid(row=2, column=0, sticky="w", pady=(10, 5))
+
+        # Tạo biến và switch cho MR App
+        self.mr_app_var = tk.BooleanVar(value=False)
+
+        self.mr_app_label = ttk.Label(mr_app_panel, text="Mở rộng bồi thường qua app Bvdirect:")
+        self.mr_app_label.grid(row=0, column=0, sticky="w", pady=(0, 5))
+
+        mr_app_switch = ttk.Checkbutton(
+            mr_app_panel,
+            bootstyle="round-toggle",
+            variable=self.mr_app_var,
+            command=self._toggle_mr_app_details
+        )
+        mr_app_switch.grid(row=0, column=1, sticky="w", pady=(0, 5), padx=5)
+
+        # Ô nhập thông tin chi tiết (ban đầu bị ẩn)
+        self.mr_app_details_label = ttk.Label(mr_app_panel, text="Thông tin chi tiết:")
+        self.mr_app_details_label.grid(row=1, column=0, sticky="w", pady=(10, 5))
+
         self.mr_app_details = ttk.Entry(mr_app_panel)
-        self.mr_app_details.grid(row=2, column=1, columnspan=2, sticky="ew", padx=5, pady=(10, 5))
-        self.mr_app_details.insert(0, "Không")  # Giá trị mặc định
+        self.mr_app_details.grid(row=1, column=1, sticky="ew", padx=5, pady=(10, 5))
+
+        # Khởi tạo trạng thái ban đầu
+        self._toggle_mr_app_details()
 
         self._add_waiting_time_row() # Add the first row initially
 
@@ -114,8 +129,8 @@ class AddContractFrame(ttk.Frame):
         # --- Các nút bấm ---
         button_frame = ttk.Frame(container)
         button_frame.grid(row=2, column=0, columnspan=2, pady=20)
-        ttk.Button(button_frame, text="Lưu Hợp Đồng", command=self.submit, style="Accent.TButton").pack(side="left", padx=10)
-        ttk.Button(button_frame, text="Xóa Form", command=self.clear_form).pack(side="left")
+        ttk.Button(button_frame, text="Lưu Hợp Đồng", bootstyle="success-outline", command=self.submit).pack(side="left", padx=10)
+        ttk.Button(button_frame, text="Xóa Form", bootstyle="danger-outline", command=self.clear_form).pack(side="left")
 
     def submit(self):
         """Thu thập, kiểm tra và lưu dữ liệu hợp đồng mới."""
@@ -124,13 +139,13 @@ class AddContractFrame(ttk.Frame):
         for key, (label_text, widget) in self.fields.items():
             value = widget.get()
             if not value:
-                messagebox.showerror("Lỗi", f"Trường '{label_text}' không được để trống.")
+                Messagebox.show_error(f"Trường '{label_text}' không được để trống.", "Lỗi")
                 return
             # Chuẩn hóa ngày cho hai trường HLBH_tu, HLBH_den
             if key in ("HLBH_tu", "HLBH_den"):
                 parsed_date = _to_date(value)
                 if not parsed_date:
-                    messagebox.showerror("Lỗi", f"{label_text} không đúng định dạng dd/mm/yyyy.")
+                    Messagebox.show_error(f"{label_text} không đúng định dạng dd/mm/yyyy.", "Lỗi")
                     return
                 contract_data[key] = parsed_date.strftime("%Y-%m-%d")
             else:
@@ -142,12 +157,16 @@ class AddContractFrame(ttk.Frame):
         contract_data['sign_CF_id'] = self.sign_cf_map.get(selected_sign_cf_text)
         
         # Thêm thông tin MR App vào dữ liệu hợp đồng
-        mr_app_status = self.mr_app_var.get()
-        mr_app_details = self.mr_app_details.get().strip()
-        contract_data['mr_app'] = f"{mr_app_status} - {mr_app_details}" if mr_app_details else mr_app_status
+        if self.mr_app_var.get():  # Nếu switch đang BẬT
+            mr_app_status = "Có"
+            mr_app_details = self.mr_app_details.get().strip()
+            # Nếu bật mà không nhập chi tiết, vẫn lưu là "Có"
+            contract_data['mr_app'] = f"{mr_app_status} - {mr_app_details}" if mr_app_details else mr_app_status
+        else:
+            contract_data['mr_app'] = "Không"
 
         if not self.controller.current_user:
-            messagebox.showerror("Lỗi", "Không xác định được người dùng. Vui lòng đăng nhập lại.")
+            Messagebox.show_error("Không xác định được người dùng. Vui lòng đăng nhập lại.", "Lỗi")
             return
         contract_data['user_id'] = self.controller.current_user['id']
 
@@ -201,10 +220,10 @@ class AddContractFrame(ttk.Frame):
         success, message = database.add_contract(contract_data)
 
         if success:
-            messagebox.showinfo("Thành công", message)
+            Messagebox.show_info(message, "Thành công")
             self.clear_form()
         else:
-            messagebox.showerror("Lỗi", message)
+            Messagebox.show_error(message, "Lỗi")
 
     def _fetch_data(self):
         """Lấy dữ liệu cần thiết từ database."""
@@ -220,7 +239,7 @@ class AddContractFrame(ttk.Frame):
             self.waiting_time_options = list(self.waiting_time_map.keys())
 
         except Exception as e:
-            messagebox.showerror("Lỗi Database", f"Không thể tải dữ liệu: {e}")
+            Messagebox.show_error(f"Không thể tải dữ liệu: {e}", "Lỗi Database")
             self.sign_cf_map = {}
             self.waiting_time_map = {}
             self.waiting_time_options = []
@@ -292,25 +311,46 @@ class AddContractFrame(ttk.Frame):
             else:
                 remove_button.grid_remove()
 
+    def _toggle_mr_app_details(self):
+        """Xử lý việc hiển thị/ẩn các chi tiết của MR App dựa trên trạng thái của switch."""
+        if self.mr_app_var.get():  # Nếu switch đang BẬT
+            self.mr_app_label.config(text="CÓ MỞ RỘNG:")
+            self.mr_app_details_label.grid()
+            self.mr_app_details.grid()
+            self.mr_app_details.delete(0, tk.END)  # Xóa văn bản mặc định
+            self.mr_app_details.focus() # Tự động focus vào ô nhập liệu
+        else:  # Nếu switch đang TẮT
+            self.mr_app_label.config(text="Mở rộng bồi thường qua app Bvdirect:")
+            self.mr_app_details_label.grid_remove()
+            self.mr_app_details.grid_remove()
+            self.mr_app_details.delete(0, tk.END)
+            self.mr_app_details.insert(0, "Không")
+
     def clear_form(self):
-        """Xóa toàn bộ dữ liệu trên form."""
-        # Clear left panel fields
-        for key, (_, widget) in self.fields.items():
-            if isinstance(widget, ttk.Combobox):
-                widget.set('')
-            else:
-                widget.delete(0, tk.END)
-
-        # Reset right panel (waiting times)
-        self._clear_waiting_time_rows()
+        """Hiển thị hộp thoại xác nhận trước khi xóa toàn bộ dữ liệu trên form."""
+        result = Messagebox.yesno(
+            title="Xác nhận Xóa Form",
+            message="Bạn có chắc chắn muốn xóa toàn bộ thông tin đã nhập không?",
+            alert=True  # Hiển thị cửa sổ như một cảnh báo
+        )
         
-        # Reset MR App section
-        self.mr_app_var.set("Không")
-        self.mr_app_details.delete(0, tk.END)
-        self.mr_app_details.insert(0, "Không")
+        if result == "Yes":
+            # Clear left panel fields
+            for key, (_, widget) in self.fields.items():
+                if isinstance(widget, ttk.Combobox):
+                    widget.set('')
+                else:
+                    widget.delete(0, tk.END)
 
-        # Reset bottom left panel (special cards)
-        self._clear_special_card_rows()
+            # Reset right panel (waiting times)
+            self._clear_waiting_time_rows()
+            
+            # Reset MR App section
+            self.mr_app_var.set(False)
+            self._toggle_mr_app_details()
+
+            # Reset bottom left panel (special cards)
+            self._clear_special_card_rows()
 
     def _show_add_waiting_time_popup(self):
         """Hiển thị popup để thêm thời gian chờ mới."""
@@ -337,21 +377,21 @@ class AddContractFrame(ttk.Frame):
             mo_ta = mo_ta_entry.get().strip()
 
             if not loai_cho or not mo_ta:
-                messagebox.showerror("Lỗi", "Vui lòng điền đầy đủ thông tin.", parent=popup)
+                Messagebox.show_error("Vui lòng điền đầy đủ thông tin.", "Lỗi", parent=popup)
                 return
 
             success, message = database.add_waiting_time(loai_cho, mo_ta)
             if success:
-                messagebox.showinfo("Thành công", message, parent=popup)
+                Messagebox.show_info(message, "Thành công", parent=popup)
                 popup.destroy()
                 self._refresh_waiting_time_data() # Refresh data and UI
             else:
-                messagebox.showerror("Lỗi", message, parent=popup)
+                Messagebox.show_error(message, "Lỗi", parent=popup)
 
         def show_guide():
-            messagebox.showinfo(
-                "Hướng dẫn",
+            Messagebox.show_info(
                 "Lưu ý: Chỉ nhập thông tin chưa có trong danh mục thời gian chờ.\n\n1. Chỉ nhập quy định chờ, không cần nhập số ngày chờ.",
+                "Hướng dẫn",
                 parent=popup
             )
 
@@ -369,7 +409,7 @@ class AddContractFrame(ttk.Frame):
             self.waiting_time_map = {f"{item['loai_cho']} - {item['mo_ta']}": item['id'] for item in waiting_times_data}
             self.waiting_time_options = list(self.waiting_time_map.keys())
         except Exception as e:
-            messagebox.showerror("Lỗi Database", f"Không thể tải lại dữ liệu thời gian chờ: {e}")
+            Messagebox.show_error(f"Không thể tải lại dữ liệu thời gian chờ: {e}", "Lỗi Database")
             return
 
         # Update all existing comboboxes

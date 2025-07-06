@@ -1,5 +1,6 @@
 import tkinter as tk
-from tkinter import ttk, messagebox, font
+import ttkbootstrap as ttk
+from ttkbootstrap.dialogs import Messagebox
 import database as db
 import datetime  # TODO: Remove if no longer used elsewhere
 from utils.date_utils import format_date, format_date_range
@@ -52,7 +53,7 @@ class AddBenefitFrame(ttk.Frame):
         self.main_container.columnconfigure(2, minsize=200)  # Panel thông tin
         
         # ========== Panel 1: Search Panel ==========
-        search_frame = ttk.LabelFrame(self.main_container, text="Tìm kiếm hợp đồng", padding=5)
+        search_frame = ttk.LabelFrame(self.main_container, text="Tìm kiếm hợp đồng", padding=5, bootstyle="info")
         search_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 5), pady=(0, 5))
         search_frame.columnconfigure(0, weight=1)
         search_frame.rowconfigure(1, weight=1)
@@ -75,7 +76,8 @@ class AddBenefitFrame(ttk.Frame):
         search_btn = ttk.Button(
             search_row, 
             text=" Tìm ",  # Added spaces for better width
-            command=self.search_contract
+            command=self.search_contract,
+            bootstyle="light"
         )
         search_btn.pack(side="right", padx=(0, 0))
         
@@ -87,11 +89,10 @@ class AddBenefitFrame(ttk.Frame):
         self.results_frame = ttk.LabelFrame(
             self.main_container, 
             text="Kết quả tìm kiếm", 
-            padding=5
+            padding=5,
+            bootstyle="info"
         )
         self.results_frame.grid(row=0, column=1, sticky="nsew", padx=5, pady=(0, 5))
-        self.results_frame.columnconfigure(0, weight=1)
-        self.results_frame.rowconfigure(0, weight=1)
         self.results_frame.columnconfigure(0, weight=1)
         self.results_frame.rowconfigure(0, weight=1)
         
@@ -138,20 +139,20 @@ class AddBenefitFrame(ttk.Frame):
         # Đặt Treeview vào container với thanh cuộn
         self.tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         
-        # Đặt kích thước tối thiểu cho khung kết quả tìm kiếm (nhỏ gọn hơn)
-        self.results_frame.columnconfigure(0, weight=1, minsize=500)
-        
-        # Cho phép Treeview mở rộng tối đa
-        self.tree.pack_configure(expand=True, fill=tk.BOTH)
-        
-        # Bind double-click event
+        # Bind events
         self.tree.bind("<Double-1>", self.on_contract_select)
+        # Tooltip for row hover
+        self._tooltip_window = None
+        self._current_hover_row = None
+        self.tree.bind("<Motion>", self._on_tree_motion)
+        self.tree.bind("<Leave>", lambda e: self._hide_tooltip())
         
         # ========== Panel 3: Contract Info Panel ==========
         self.contract_info_frame = ttk.LabelFrame(
             self.main_container, 
             text="Thông tin hợp đồng", 
-            padding=5
+            padding=5,
+            bootstyle="info"
         )
         self.contract_info_frame.grid(row=0, column=2, sticky="nsew", padx=(5, 0), pady=(0, 5))
         self.contract_info_frame.columnconfigure(1, weight=1)
@@ -169,7 +170,8 @@ class AddBenefitFrame(ttk.Frame):
         self.add_benefit_frame = ttk.LabelFrame(
             self.main_container,
             text="Thêm quyền lợi mới",
-            padding=40
+            padding=40,
+            bootstyle="info"
         )
         # Make it span all 3 columns
         self.add_benefit_frame.grid(row=1, column=0, columnspan=3, sticky="nsew", pady=(10, 0))
@@ -201,7 +203,7 @@ class AddBenefitFrame(ttk.Frame):
         self.setup_benefit_details_form()
 
         # Submit Button
-        submit_button = ttk.Button(self.add_benefit_frame, text="Lưu quyền lợi", command=self.submit_benefit, style="Accent.TButton")
+        submit_button = ttk.Button(self.add_benefit_frame, text="Lưu quyền lợi", bootstyle="success-outline", command=self.submit_benefit)
         submit_button.grid(row=2, column=0, columnspan=6, pady=(15, 5))
         
         # Status bar (use grid instead of pack)
@@ -251,7 +253,7 @@ class AddBenefitFrame(ttk.Frame):
         """Searches for contracts using the new database function."""
         search_term = self.search_var.get().strip()
         if not search_term:
-            messagebox.showwarning("Cảnh báo", "Vui lòng nhập số hợp đồng hoặc tên công ty để tìm kiếm")
+            Messagebox.show_warning("Vui lòng nhập số hợp đồng hoặc tên công ty để tìm kiếm", "Cảnh báo")
             return
 
         try:
@@ -267,7 +269,7 @@ class AddBenefitFrame(ttk.Frame):
             self.contracts_data.clear()
 
             if not results:
-                messagebox.showinfo("Thông báo", "Không tìm thấy hợp đồng nào phù hợp")
+                Messagebox.show_info("Không tìm thấy hợp đồng nào phù hợp", "Thông báo")
                 self.status_label.config(text="Không tìm thấy hợp đồng nào phù hợp", style="Error.TLabel")
                 return
 
@@ -295,9 +297,48 @@ class AddBenefitFrame(ttk.Frame):
             import traceback
             error_details = traceback.format_exc()
             print(f"Lỗi khi tìm kiếm hợp đồng: {error_details}")
-            messagebox.showerror("Lỗi", f"Lỗi khi thực hiện tìm kiếm: {e}")
+            Messagebox.show_error(f"Lỗi khi thực hiện tìm kiếm: {e}", "Lỗi")
             self.status_label.config(text="Đã xảy ra lỗi khi tìm kiếm", style="Error.TLabel")
     
+    # ---------------- Tooltip helpers -----------------
+    def _on_tree_motion(self, event):
+        """Show/update tooltip when hovering over a Treeview row."""
+        row_id = self.tree.identify_row(event.y)
+        if row_id != self._current_hover_row:
+            self._current_hover_row = row_id
+            if not row_id:
+                self._hide_tooltip()
+                return
+            # Get data for tooltip
+            values = self.tree.item(row_id, "values")
+            if not values:
+                self._hide_tooltip()
+                return
+            card_no = values[0]  # "Số HĐ" column value
+            company = values[1]  # "Công ty" column value
+            text = f"Số thẻ: {card_no}\nCông ty: {company}"
+            self._show_tooltip(event.x_root + 20, event.y_root + 10, text)
+        else:
+            # Reposition existing tooltip
+            if self._tooltip_window and self._tooltip_window.winfo_exists():
+                self._tooltip_window.geometry(f"+{event.x_root + 20}+{event.y_root + 10}")
+
+    def _show_tooltip(self, x, y, text):
+        self._hide_tooltip()
+        self._tooltip_window = tw = tk.Toplevel(self.tree)
+        tw.wm_overrideredirect(True)
+        tw.attributes("-topmost", True)
+        label = ttk.Label(tw, text=text, padding=5, bootstyle="light")
+        label.pack()
+        tw.geometry(f"+{x}+{y}")
+
+    def _hide_tooltip(self):
+        if self._tooltip_window and self._tooltip_window.winfo_exists():
+            self._tooltip_window.destroy()
+        self._tooltip_window = None
+        self._current_hover_row = None
+
+    # ---------------- Existing methods -----------------
     def on_contract_select(self, event):
         """Handle contract selection from search results."""
         try:
@@ -332,7 +373,7 @@ class AddBenefitFrame(ttk.Frame):
         except Exception as e:
             import traceback
             print(traceback.format_exc())
-            messagebox.showerror("Lỗi", f"Không thể chọn hợp đồng: {e}")
+            Messagebox.show_error(f"Không thể chọn hợp đồng: {e}", "Lỗi")
             self.status_label.config(text="Đã xảy ra lỗi khi chọn hợp đồng", style="Error.TLabel")
     
     def update_contract_info(self):
@@ -413,7 +454,7 @@ class AddBenefitFrame(ttk.Frame):
             ).grid(row=row, column=0, columnspan=2, sticky="ew", pady=10)
             
         except Exception as e:
-            messagebox.showerror("Lỗi", f"Không thể cập nhật thông tin hợp đồng: {str(e)}")
+            Messagebox.show_error(f"Không thể cập nhật thông tin hợp đồng: {str(e)}", "Lỗi")
     
 
     
@@ -437,7 +478,7 @@ class AddBenefitFrame(ttk.Frame):
                 )
                 rb.grid(row=0, column=idx, padx=2, pady=2, sticky='w')
         except Exception as e:
-            messagebox.showerror("Lỗi", f"Không thể tải danh sách nhóm quyền lợi: {e}")
+            Messagebox.show_error(f"Không thể tải danh sách nhóm quyền lợi: {e}", "Lỗi")
 
     def setup_benefit_details_form(self):
         """Creates the form for benefit details."""
@@ -452,7 +493,7 @@ class AddBenefitFrame(ttk.Frame):
         # Entry fields
         self.benefit_name_entry = ttk.Entry(self.benefit_details_frame, width=40)
         self.benefit_limit_entry = ttk.Entry(self.benefit_details_frame, width=40)
-        self.benefit_desc_text = tk.Text(self.benefit_details_frame, height=4, wrap=tk.WORD, font=("Segoe UI", 10))
+        self.benefit_desc_text = ttk.Text(self.benefit_details_frame, height=4, wrap=tk.WORD, font=("Segoe UI", 10))
         
         # Layout
         self.benefit_name_entry.grid(row=0, column=1, padx=5, pady=5, sticky="ew")
@@ -464,7 +505,7 @@ class AddBenefitFrame(ttk.Frame):
     def submit_benefit(self):
         """Validates form data and submits the new benefit to the database."""
         if not self.current_contract:
-            messagebox.showwarning("Cảnh báo", "Vui lòng chọn một hợp đồng trước khi thêm quyền lợi.")
+            Messagebox.show_warning("Vui lòng chọn một hợp đồng trước khi thêm quyền lợi.", "Cảnh báo")
             return
 
         # --- Get and validate data ---
@@ -474,7 +515,7 @@ class AddBenefitFrame(ttk.Frame):
         benefit_desc = self.benefit_desc_text.get("1.0", tk.END).strip()
 
         if not all([group_name, benefit_name, benefit_limit]):
-            messagebox.showwarning("Thiếu thông tin", "Vui lòng điền đầy đủ các trường bắt buộc: Nhóm, Tên, và Giới hạn quyền lợi.")
+            Messagebox.show_warning("Vui lòng điền đầy đủ các trường bắt buộc: Nhóm, Tên, và Giới hạn quyền lợi.", "Thiếu thông tin")
             return
 
         try:
@@ -485,7 +526,7 @@ class AddBenefitFrame(ttk.Frame):
             success = db.add_benefit(contract_id, group_id, benefit_name, benefit_limit, benefit_desc)
 
             if success:
-                messagebox.showinfo("Thành công", f"Đã thêm quyền lợi '{benefit_name}' vào hợp đồng.")
+                Messagebox.show_info(f"Đã thêm quyền lợi '{benefit_name}' vào hợp đồng.", "Thành công")
                 # Clear form for next entry
                 self.benefit_name_entry.delete(0, tk.END)
                 self.benefit_limit_entry.delete(0, tk.END)
@@ -493,9 +534,9 @@ class AddBenefitFrame(ttk.Frame):
                 self.benefit_group_var.set('')
                 self.benefit_name_entry.focus()
             else:
-                messagebox.showerror("Lỗi", "Không thể lưu quyền lợi vào cơ sở dữ liệu.")
+                Messagebox.show_error("Không thể lưu quyền lợi vào cơ sở dữ liệu.", "Lỗi")
 
         except KeyError:
-            messagebox.showerror("Lỗi", "Nhóm quyền lợi không hợp lệ.")
+            Messagebox.show_error("Nhóm quyền lợi không hợp lệ.", "Lỗi")
         except Exception as e:
-            messagebox.showerror("Lỗi", f"Đã xảy ra lỗi khi lưu quyền lợi: {e}")
+            Messagebox.show_error(f"Đã xảy ra lỗi khi lưu quyền lợi: {e}", "Lỗi")

@@ -1,5 +1,24 @@
 import sys
+import os
+import certifi
+# Ensure bundled certs are used before any network library imports
+os.environ.setdefault("SSL_CERT_FILE", certifi.where())
+os.environ.setdefault("REQUESTS_CA_BUNDLE", certifi.where())
 import asyncio
+
+# Import embedded environment variables (generated at build time)
+try:
+    import internal_env  # noqa: F401  # sets os.environ via side-effects
+except ModuleNotFoundError:
+    # Running from source without generated module – fall back to .env if exists
+    from pathlib import Path
+    env_path = Path(__file__).with_suffix('.env')
+    if env_path.exists():
+        for line in env_path.read_text(encoding='utf-8').splitlines():
+            if not line or line.startswith('#') or '=' not in line:
+                continue
+            k, v = line.split('=', 1)
+            os.environ.setdefault(k.strip(), v.strip())
 
 # Ensure compatible event loop on Windows when running frozen without start.py
 if sys.platform == "win32":
@@ -9,7 +28,8 @@ if sys.platform == "win32":
 
 
 import tkinter as tk
-from tkinter import ttk, messagebox
+import ttkbootstrap as ttk
+from ttkbootstrap.dialogs import Messagebox
 from ui.login_frame import LoginFrame
 from ui.main_app_frame import MainApplicationFrame
 import database
@@ -56,7 +76,7 @@ DOWNLOAD_URL = "https://1drv.ms/f/c/5f21643f394cb276/EmPmLLE1dYtNrzdyMwIzwQgB-66
 
 def _show_update_dialog(parent: tk.Tk, remote_ver: str, notes: str):
     """Hiển thị hộp thoại cập nhật với nút Download."""
-    dlg = tk.Toplevel(parent)
+    dlg = ttk.Toplevel(parent)
     dlg.title("Có phiên bản mới")
     dlg.transient(parent)
     dlg.grab_set()
@@ -83,11 +103,14 @@ def _show_update_dialog(parent: tk.Tk, remote_ver: str, notes: str):
     dlg.geometry(f"{w}x{h}+{x}+{y}")
 
 
-class App(tk.Tk):
+class App(ttk.Window):
     def __init__(self):
-        super().__init__()
+        super().__init__(themename="superhero")
         self.title(f"PolicyTrack {__version__}")
         self.geometry("1000x800")
+
+        # Xử lý sự kiện đóng cửa sổ để thoát ứng dụng một cách an toàn
+        self.protocol("WM_DELETE_WINDOW", self.on_closing)
 
         # Để sau khi đăng nhập mới kiểm tra phiên bản → tránh hộp thoại che màn hình login
         self._update_thread_started = False
@@ -132,6 +155,10 @@ class App(tk.Tk):
 
         self.show_frame("LoginFrame")
 
+    def on_closing(self):
+        """Xử lý khi người dùng đóng cửa sổ chính."""
+        self.destroy()
+
     def show_frame(self, page_name):
         """Hiển thị một frame dựa trên tên của nó."""
         frame = self.frames[page_name]
@@ -156,7 +183,7 @@ class App(tk.Tk):
 
     def logout(self):
         """Xử lý đăng xuất, quay về màn hình Login."""
-        if messagebox.askyesno("Xác nhận Đăng xuất", "Bạn có chắc chắn muốn đăng xuất không?", parent=self):
+        if Messagebox.yesno("Xác nhận Đăng xuất", "Bạn có chắc chắn muốn đăng xuất không?"):
             # Reset lại trạng thái của MainApplicationFrame
             main_frame = self.frames["MainApplicationFrame"]
             main_frame.reset_to_default_state()
