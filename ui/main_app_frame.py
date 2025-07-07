@@ -6,6 +6,26 @@ from .admin_features_frame import AdminFeaturesFrame
 from .add_contract_frame import AddContractFrame
 from .contract_view_panel import CheckContractPanel
 from .add_benefit_frame import AddBenefitFrame
+from .edit_contract_panel import EditContractPanel
+from .edit_benefit_panel import EditBenefitPanel
+
+class EditPanelSelector(ttk.Frame):
+    def __init__(self, master, show_edit_contract, show_edit_benefit):
+        super().__init__(master)
+        label = ttk.Label(
+            self,
+            text="Chọn hành động chỉnh sửa:",
+            style="Title.TLabel",
+            font=("Arial", 14, "bold")
+        )
+        label.pack(pady=(20, 15))
+        btn_frame = ttk.Frame(self)
+        btn_frame.pack(pady=5)
+        btn_edit_contract = ttk.Button(btn_frame, text="Chỉnh sửa hợp đồng chính", bootstyle="warning-outline", command=show_edit_contract, width=25)
+        btn_edit_contract.pack(side='left', padx=10)
+        btn_edit_benefit = ttk.Button(btn_frame, text="Chỉnh sửa quyền lợi", bootstyle="warning-outline", command=show_edit_benefit, width=25)
+        btn_edit_benefit.pack(side='left', padx=10)
+
 
 class MainApplicationFrame(ttk.Frame):
     def __init__(self, parent, controller):
@@ -46,8 +66,8 @@ class MainApplicationFrame(ttk.Frame):
         self.check_contract_button = ttk.Button(button_panel, text="Kiểm tra Hợp đồng", bootstyle="primary-outline", command=lambda: self.show_content_panel('CheckContractPanel'))
         self.add_contract_button = ttk.Button(button_panel, text="Thêm Hợp đồng mới", bootstyle="success-outline", command=lambda: self.show_content_panel('AddContractFrame'))
         self.add_benefit_button = ttk.Button(button_panel, text="Thêm Quyền Lợi", bootstyle="info-outline", command=lambda: self.show_content_panel('AddBenefitFrame'))
-        self.edit_contract_button = ttk.Button(button_panel, text="Chỉnh sửa Hợp đồng", bootstyle="warning-outline", command=lambda: self.show_content_panel("edit")) # 'edit' chưa có frame
-        
+        self.edit_contract_button = ttk.Button(button_panel, text="Chỉnh sửa Hợp đồng", bootstyle="warning-outline", command=lambda: self.show_content_panel("EditPanelSelector"))
+
         self.check_contract_button.pack(side='left', expand=True, fill='x', padx=5)
         self.add_contract_button.pack(side='left', expand=True, fill='x', padx=5)
         self.add_benefit_button.pack(side='left', expand=True, fill='x', padx=5)
@@ -60,18 +80,22 @@ class MainApplicationFrame(ttk.Frame):
         self.content_panel.grid_columnconfigure(0, weight=1)
 
     def _initialize_content_frames(self):
+        self.frames = {}
         for F in (AddContractFrame, CheckContractPanel, AddBenefitFrame):
             page_name = F.__name__
             frame = F(self.content_panel, self.controller)
             self.frames[page_name] = frame
             frame.grid(row=0, column=0, sticky="nsew")
+        # Thêm panel selector trung gian
+        self.frames['EditPanelSelector'] = EditPanelSelector(self.content_panel, lambda: self.show_content_panel('EditContractPanel'), lambda: self.show_content_panel('EditBenefitPanel'))
+        self.frames['EditContractPanel'] = EditContractPanel(self.content_panel, self.controller)
+        self.frames['EditBenefitPanel'] = EditBenefitPanel(self.content_panel)
+        self.frames['EditPanelSelector'].grid(row=0, column=0, sticky="nsew")
+        self.frames['EditContractPanel'].grid(row=0, column=0, sticky="nsew")
+        self.frames['EditBenefitPanel'].grid(row=0, column=0, sticky="nsew")
         self.show_content_panel(None) # Ẩn tất cả khi bắt đầu
 
     def show_content_panel(self, page_name):
-        if page_name == "edit": # Ví dụ xử lý frame chưa có
-            messagebox.showinfo("Thông báo", "Chức năng 'Chỉnh sửa Hợp đồng' đang được phát triển.")
-            return
-
         for frame in self.frames.values():
             frame.grid_remove()
         

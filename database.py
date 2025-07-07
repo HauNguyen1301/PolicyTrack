@@ -419,17 +419,15 @@ def search_contracts(company_name='', contract_number='', benefit_group_ids=None
 # --- Helper functions for contract details (using the passed connection) ---
 
 def get_waiting_periods_for_contract(conn, contract_id):
-    """Trả về list[(loai_cho, gia_tri)] để UI hiển thị 'loai_cho: gia_tri'."""
+    """Trả về list of dicts [{'cho_id': id, 'gia_tri': value}] cho một hợp đồng."""
     query = """
-        SELECT tgc.loai_cho, hqc.gia_tri
-        FROM hopdong_quydinh_cho hqc
-        JOIN thoi_gian_cho tgc ON hqc.cho_id = tgc.id
-        WHERE hqc.hopdong_id = ?
+        SELECT cho_id, gia_tri
+        FROM hopdong_quydinh_cho
+        WHERE hopdong_id = ?
     """
     try:
-        rs = conn.execute(query, [contract_id])
-        # Trả về list tuple (loai_cho, gia_tri)
-        return [(row[0], row[1]) for row in rs.rows]
+        rs = conn.execute(query, (contract_id,))
+        return _to_dicts(rs)
     except Exception as e:
         print(f"Error fetching waiting periods for contract {contract_id}: {e}")
         return []
@@ -514,6 +512,66 @@ def get_all_waiting_times():
         return []
     finally:
         pass  # keep global client open
+
+def update_contract_waiting_periods(hopdong_id, waiting_periods):
+    """
+    Atomically updates the waiting periods for a contract using a batch operation.
+    This first deletes all existing periods for the contract, then inserts the new ones.
+    """
+    conn = get_db_connection()
+    try:
+        stmts = []
+        # Statement to delete old periods
+        stmts.append(libsql_client.Statement("DELETE FROM hopdong_quydinh_cho WHERE hopdong_id = ?", [hopdong_id]))
+
+        # Statements to insert new periods
+        if waiting_periods:
+            for wp in waiting_periods:
+                stmts.append(
+                    libsql_client.Statement(
+                        "INSERT INTO hopdong_quydinh_cho (hopdong_id, cho_id, gia_tri) VALUES (?, ?, ?)",
+                        [hopdong_id, wp['cho_id'], wp['gia_tri']]
+                    )
+                )
+        
+        # Execute as a batch
+        if stmts:
+            conn.batch(stmts)
+        print(f"Đã cập nhật thành công {len(waiting_periods)} quy định thời gian chờ cho hợp đồng ID: {hopdong_id}")
+
+    except Exception as e:
+        print(f"Database error while updating waiting periods for contract {hopdong_id}: {e}")
+        raise Exception(f"Lỗi database khi cập nhật thời gian chờ: {e}")
+
+def update_contract_special_cards(hopdong_id, special_cards):
+    """
+    Atomically updates the special cards for a contract using a batch operation.
+    This first deletes all existing cards for the contract, then inserts the new ones.
+    """
+    conn = get_db_connection()
+    try:
+        stmts = []
+        # Statement to delete old cards
+        stmts.append(libsql_client.Statement("DELETE FROM sothe_dacbiet WHERE hopdong_id = ?", [hopdong_id]))
+
+        # Statements to insert new cards
+        if special_cards:
+            for card in special_cards:
+                stmts.append(
+                    libsql_client.Statement(
+                        "INSERT INTO sothe_dacbiet (hopdong_id, so_the, ten_NDBH, ghi_chu) VALUES (?, ?, ?, ?)",
+                        [hopdong_id, card['so_the'], card['ten_NDBH'], card['ghi_chu']]
+                    )
+                )
+        
+        # Execute as a batch
+        if stmts:
+            conn.batch(stmts)
+        print(f"Đã cập nhật thành công {len(special_cards)} thẻ đặc biệt cho hợp đồng ID: {hopdong_id}")
+
+    except Exception as e:
+        print(f"Database error while updating special cards for contract {hopdong_id}: {e}")
+        raise Exception(f"Lỗi database khi cập nhật thẻ đặc biệt: {e}")
 
 def add_waiting_time(loai_cho, mo_ta):
     """Adds a new waiting time definition."""

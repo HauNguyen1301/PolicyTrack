@@ -99,6 +99,7 @@ class CheckContractPanel(ttk.Frame):
 
 
     def perform_search(self):
+        self.result_text.tag_configure("benefit", font=("Segoe UI", 10))
         """Thực hiện tìm kiếm và hiển thị kết quả."""
         # Xóa kết quả cũ và chuyển sang chế độ chỉnh sửa
         self.result_text.config(state='normal')
@@ -169,7 +170,7 @@ class CheckContractPanel(ttk.Frame):
                 if waiting_periods:
                     self.result_text.insert(tk.END, "- Thời gian chờ:\n", "subheader")
                     for period in waiting_periods:
-                        self.result_text.insert(tk.END, f"  + {period[0]}: {period[1]}\n", "benefit")
+                        self.result_text.insert(tk.END, f"  + {period['loai_cho']}: {period['gia_tri']}\n", "benefit")
 
 
                 # Hiển thị thông tin MR App nếu có

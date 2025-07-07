@@ -204,7 +204,7 @@ class App(ttk.Window):
 
     def logout(self):
         """Xử lý đăng xuất, quay về màn hình Login."""
-        if Messagebox.yesno("Xác nhận Đăng xuất", "Bạn có chắc chắn muốn đăng xuất không?"):
+        if Messagebox.yesno("Xác nhận Đăng xuất", "Bạn có chắc chắn muốn đăng xuất không?") == "Yes":
             # Reset lại trạng thái của MainApplicationFrame
             main_frame = self.frames["MainApplicationFrame"]
             main_frame.reset_to_default_state()

@@ -165,10 +165,10 @@ class AddContractFrame(ttk.Frame):
         else:
             contract_data['mr_app'] = "Không"
 
-        if not self.controller.current_user:
+        if not self.controller.current_user or 'id' not in self.controller.current_user:
             Messagebox.show_error("Không xác định được người dùng. Vui lòng đăng nhập lại.", "Lỗi")
             return
-        contract_data['user_id'] = self.controller.current_user['id']
+        contract_data['created_by'] = self.controller.current_user['id']
 
         # --- Thu thập dữ liệu thời gian chờ từ panel phải ---
         waiting_times = []
