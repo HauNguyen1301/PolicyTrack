@@ -60,6 +60,13 @@ class CheckContractPanel(ttk.Frame):
         search_button_frame.grid(row=2, column=0, columnspan=4, pady=10, sticky='e')
         search_button = ttk.Button(search_button_frame, text="Tìm kiếm",bootstyle="outline-info", command=self.perform_search)
         search_button.pack()
+        
+        # Bind Enter key to perform search
+        search_button.bind('<Return>', lambda e: self.perform_search())
+        
+        # Also bind Enter key to the entry fields
+        self.company_entry.bind('<Return>', lambda e: self.perform_search())
+        self.contract_entry.bind('<Return>', lambda e: self.perform_search())
 
         search_frame.columnconfigure(1, weight=1)
         search_frame.columnconfigure(3, weight=1)
@@ -104,13 +111,13 @@ class CheckContractPanel(ttk.Frame):
 
         # Kiểm tra điều kiện tìm kiếm
         if not company_name and not contract_number and not selected_group_ids:
-            messagebox.showwarning("Cảnh báo", "Vui lòng nhập ít nhất một tiêu chí tìm kiếm.", parent=self)
+            Messagebox.show_warning("Vui lòng nhập ít nhất một tiêu chí tìm kiếm.", "Cảnh báo",parent=self)
             return
 
         results = database.search_contracts(company_name, contract_number, selected_group_ids)
 
         if not results:
-            messagebox.showinfo("Thông báo", "Không tìm thấy hợp đồng nào phù hợp.", parent=self)
+            Messagebox.show_info( "Không tìm thấy hợp đồng nào phù hợp.","Thông báo", parent=self)
         else:
             for i, contract_data in enumerate(results):
                 details = contract_data['details']

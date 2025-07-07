@@ -42,33 +42,54 @@ import webbrowser
 from policytrack_version import __version__
 
 # URL tới file JSON chứa thông tin phiên bản mới nhất
-UPDATE_URL = (
+UPDATE_URL = os.environ.get('POLICYTRACK_UPDATE_URL', (
     "https://raw.githubusercontent.com/"
     "HauNguyen1301/PolicyTrack/main/updates/latest.json"
-)
+))
 
 def _check_for_update(parent):
     """Chạy ở luồng nền; nếu có version mới thì thông báo."""
     try:
-        resp = requests.get(UPDATE_URL, timeout=3)
+        resp = requests.get(UPDATE_URL, 
+                          timeout=3,
+                          verify=True,  # Enable SSL verification
+                          headers={'User-Agent': 'PolicyTrack/1.0'})
+        
+        if resp.status_code != 200:
+            raise Exception(f"HTTP Error {resp.status_code}")
+            
         if __debug__:
             print("[UpdateCheck] HTTP status:", resp.status_code)
+        
         data = resp.json()
         remote_ver = data.get("version", "")
+        
         if __debug__:
             print(f"[UpdateCheck] Local {__version__} / Remote {remote_ver}")
+        
         if remote_ver and _vparse(remote_ver) > _vparse(__version__):
+            # Sanitize notes to prevent XSS
             raw_notes = data.get("notes", "")
             if isinstance(raw_notes, list):
                 notes = "\n".join(f"- {line}" for line in raw_notes)
             else:
                 notes = str(raw_notes)
+                
+            # Escape HTML entities
+            notes = notes.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+                
             parent.after(0, lambda: _show_update_dialog(parent, remote_ver, notes))
+    except requests.exceptions.RequestException as e:
+        if __debug__:
+            print('[UpdateCheck] Network Error:', e)
+        pass
+    except ValueError as e:
+        if __debug__:
+            print('[UpdateCheck] JSON Error:', e)
+        pass
     except Exception as e:
         if __debug__:
             print('[UpdateCheck] Error:', e)
-
-        # Im lặng nếu không thể kiểm tra (offline, lỗi JSON, v.v.)
         pass
 
 # ---- Custom update dialog ----
