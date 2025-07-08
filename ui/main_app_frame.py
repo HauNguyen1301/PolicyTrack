@@ -65,7 +65,7 @@ class MainApplicationFrame(ttk.Frame):
 
         self.check_contract_button = ttk.Button(button_panel, text="Kiểm tra Hợp đồng", bootstyle="primary-outline", command=lambda: self.show_content_panel('CheckContractPanel'))
         self.add_contract_button = ttk.Button(button_panel, text="Thêm Hợp đồng mới", bootstyle="success-outline", command=lambda: self.show_content_panel('AddContractFrame'))
-        self.add_benefit_button = ttk.Button(button_panel, text="Thêm Quyền Lợi", bootstyle="info-outline", command=lambda: self.show_content_panel('AddBenefitFrame'))
+        self.add_benefit_button = ttk.Button(button_panel, text="Thêm Quyền Lợi", bootstyle="info-outline", command=lambda: self.show_content_panel('AddBenefitFrame'), state="disabled")
         self.edit_contract_button = ttk.Button(button_panel, text="Chỉnh sửa Hợp đồng", bootstyle="warning-outline", command=lambda: self.show_content_panel("EditPanelSelector"))
 
         self.check_contract_button.pack(side='left', expand=True, fill='x', padx=5)

@@ -419,44 +419,34 @@ def search_contracts(company_name='', contract_number='', benefit_group_ids=None
 # --- Helper functions for contract details (using the passed connection) ---
 
 def get_waiting_periods_for_contract(conn, contract_id):
-    """Trả về list of dicts [{'cho_id': id, 'gia_tri': value}] cho một hợp đồng."""
+    """Trả về list of dicts [{'loai_cho': name, 'gia_tri': value}] cho một hợp đồng."""
     query = """
-        SELECT cho_id, gia_tri
-        FROM hopdong_quydinh_cho
-        WHERE hopdong_id = ?
+        SELECT tgc.loai_cho, hqc.gia_tri
+        FROM hopdong_quydinh_cho hqc
+        JOIN thoi_gian_cho tgc ON hqc.cho_id = tgc.id
+        WHERE hqc.hopdong_id = ?
     """
-    try:
-        rs = conn.execute(query, (contract_id,))
-        return _to_dicts(rs)
-    except Exception as e:
-        print(f"Error fetching waiting periods for contract {contract_id}: {e}")
-        return []
+    rs = conn.execute(query, [contract_id])
+    return _to_dicts(rs)
 
 def get_benefits_for_contract(conn, contract_id, benefit_group_ids=None):
-    """Trả về list[(ten_quyenloi, han_muc, mo_ta)] để UI hiển thị."""
-    # Xây dựng truy vấn động dựa trên danh sách nhóm quyền lợi, nếu có
+    """Trả về list of dicts để UI hiển thị."""
+    base_query = """
+        SELECT qlc.ten_quyenloi, qlc.han_muc, qlc.mo_ta
+        FROM quyenloi_chitiet qlc
+        WHERE qlc.hopdong_id = ? AND qlc.isActive = 1
+    """
     params = [contract_id]
+
     if benefit_group_ids:
         placeholders = ', '.join(['?'] * len(benefit_group_ids))
-        query = f"""
-            SELECT ten_quyenloi, han_muc, mo_ta
-            FROM quyenloi_chitiet
-            WHERE hopdong_id = ?
-              AND nhom_id IN ({placeholders})
-        """
-        params += benefit_group_ids
+        query = f"{base_query} AND qlc.nhom_id IN ({placeholders})"
+        params.extend(benefit_group_ids)
     else:
-        query = """
-            SELECT ten_quyenloi, han_muc, mo_ta
-            FROM quyenloi_chitiet
-            WHERE hopdong_id = ?
-        """
-    try:
-        rs = conn.execute(query, params)
-        return [(row[0], row[1], row[2]) for row in rs.rows]
-    except Exception as e:
-        print(f"Error fetching benefits for contract {contract_id}: {e}")
-        return []
+        query = base_query
+
+    rs = conn.execute(query, params)
+    return _to_dicts(rs)
 
 def get_special_cards_for_contract(conn, contract_id):
     """Trả về danh sách thẻ đặc biệt của hợp đồng với tên cột đúng UI mong đợi."""
@@ -500,6 +490,51 @@ def add_benefit(contract_id, benefit_group_id, benefit_name, benefit_limit, bene
         return False
     finally:
         pass  # keep global client open
+
+def update_contract_general_info(hopdong_id: int, data: Dict[str, Any]) -> Tuple[bool, str]:
+    """
+    Cập nhật thông tin chung cho một hợp đồng cụ thể.
+
+    Args:
+        hopdong_id: ID của hợp đồng cần cập nhật.
+        data: Một từ điển chứa các trường cần cập nhật.
+              Các key phải khớp với tên cột trong bảng 'hopdong_baohiem'.
+              Ví dụ: {'soHopDong': '123', 'tenCongTy': 'Tên mới'}
+
+    Returns:
+        Một tuple (success: bool, message: str).
+    """
+    client = get_db_connection()
+    if not data:
+        return False, "Không có dữ liệu để cập nhật."
+
+    # Xây dựng phần SET của câu lệnh SQL một cách linh hoạt
+    set_clauses = []
+    params = []
+    # Danh sách các cột được phép cập nhật
+    allowed_columns = ['soHopDong', 'tenCongTy', 'HLBH_tu', 'HLBH_den', 'coPay']
+
+    for key, value in data.items():
+        if key in allowed_columns:
+            set_clauses.append(f"{key} = ?")
+            params.append(value)
+
+    if not set_clauses:
+        return False, "Không có trường hợp lệ nào để cập nhật."
+
+    params.append(hopdong_id)  # Cho mệnh đề WHERE
+
+    sql = f"UPDATE hopdong_baohiem SET {', '.join(set_clauses)} WHERE id = ?"
+
+    try:
+        client.execute(sql, params)
+        return True, "Cập nhật thông tin chung thành công!"
+    except Exception as e:
+        print(f"Lỗi khi cập nhật thông tin chung của hợp đồng: {e}")
+        return False, f"Lỗi khi cập nhật thông tin chung: {e}"
+    finally:
+        pass  # Giữ kết nối client toàn cục
+
 
 def get_all_waiting_times():
     """Retrieves all waiting time options."""

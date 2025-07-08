@@ -244,6 +244,28 @@ class AddContractFrame(ttk.Frame):
             self.waiting_time_map = {}
             self.waiting_time_options = []
 
+    def _refresh_waiting_time_data(self):
+        """Làm mới dữ liệu thời gian chờ từ DB và cập nhật các combobox."""
+        try:
+            # 1. Lấy dữ liệu đã cập nhật
+            waiting_times_data = database.get_all_waiting_times()
+            self.waiting_time_map = {f"{item['loai_cho']} - {item['mo_ta']}": item['id'] for item in waiting_times_data}
+            self.waiting_time_options = list(self.waiting_time_map.keys())
+
+            # 2. Cập nhật tất cả các combobox hiện có
+            for row_frame in self.waiting_time_rows:
+                combo = row_frame.winfo_children()[0]
+                current_value = combo.get()
+                combo['values'] = self.waiting_time_options
+                # Cố gắng khôi phục lựa chọn trước đó nếu nó vẫn tồn tại
+                if current_value in self.waiting_time_options:
+                    combo.set(current_value)
+                else:
+                    combo.set('') # Xóa nếu giá trị cũ không còn
+                    
+        except Exception as e:
+            Messagebox.show_error(f"Không thể làm mới danh sách thời gian chờ: {e}", "Lỗi Database")
+
     def _add_waiting_time_row(self):
         """Thêm một hàng mới cho việc nhập thời gian chờ."""
         row_index = len(self.waiting_time_rows)

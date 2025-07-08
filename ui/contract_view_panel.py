@@ -100,6 +100,7 @@ class CheckContractPanel(ttk.Frame):
 
     def perform_search(self):
         self.result_text.tag_configure("benefit", font=("Segoe UI", 10))
+        self.result_text.tag_configure("db_bold", font=("Segoe UI", 10, "bold"))
         """Thực hiện tìm kiếm và hiển thị kết quả."""
         # Xóa kết quả cũ và chuyển sang chế độ chỉnh sửa
         self.result_text.config(state='normal')
@@ -170,22 +171,30 @@ class CheckContractPanel(ttk.Frame):
                 if waiting_periods:
                     self.result_text.insert(tk.END, "- Thời gian chờ:\n", "subheader")
                     for period in waiting_periods:
-                        self.result_text.insert(tk.END, f"  + {period['loai_cho']}: {period['gia_tri']}\n", "benefit")
-
+                        # Đảm bảo các key tồn tại trước khi truy cập
+                        loai_cho = period.get('loai_cho', 'N/A')
+                        gia_tri = period.get('gia_tri', 'N/A')
+                        self.result_text.insert(tk.END, f"  + {loai_cho}: {gia_tri}\n", "benefit")
 
                 # Hiển thị thông tin MR App nếu có
-                mr_app_info = details.get('mr_app', '')
-                if mr_app_info and mr_app_info != 'Không':
+                mr_app_info = details.get('mr_app')
+                if mr_app_info and mr_app_info.strip() and mr_app_info.strip().lower() != 'không':
                     self.result_text.insert(tk.END, "- MR App BVDirect: ", "subheader")
-                    self.result_text.insert(tk.END, f"{mr_app_info}\n", "benefit")
+                    self.result_text.insert(tk.END, f"{mr_app_info.strip()}\n", "db_value")
 
                 # Danh sách quyền lợi
                 if benefits:
                     self.result_text.insert(tk.END, "- Quyền lợi:\n", "subheader")
-                    for benefit in sorted(benefits):
-                        han_muc = f"{benefit[1]:,.0f}" if isinstance(benefit[1], (int, float)) else benefit[1]
-                        mo_ta = f"({benefit[2]})" if benefit[2] else ""
-                        self.result_text.insert(tk.END, f"  + {benefit[0]}: {han_muc} {mo_ta}\n", "benefit")
+                    for benefit_row in sorted(benefits, key=lambda x: x['ten_quyenloi']):
+                        ten_ql = benefit_row.get('ten_quyenloi', 'N/A')
+                        han_muc_val = benefit_row.get('han_muc')
+                        mo_ta_val = benefit_row.get('mo_ta', '')
+
+                        han_muc = f"{han_muc_val:,.0f}" if isinstance(han_muc_val, (int, float)) else str(han_muc_val)
+                        mo_ta = f"({mo_ta_val})" if mo_ta_val else ""
+                        self.result_text.insert(tk.END, f"  + {ten_ql}: ", "benefit")
+                        self.result_text.insert(tk.END, f"{han_muc} ", "db_bold")
+                        self.result_text.insert(tk.END, f"{mo_ta}\n", "db_value")
                 
 
                 
