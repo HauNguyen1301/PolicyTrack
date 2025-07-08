@@ -622,3 +622,100 @@ def add_waiting_time(loai_cho, mo_ta):
         return False
     finally:
         pass  # keep global client open
+
+# === NEW SEARCH FUNCTION ===
+
+
+def get_contract_by_id(hopdong_id: int, benefit_group_ids=None):
+    """Fetch a single contract with all related details by its ID.
+
+    Returns list with one element (same shape as search_contracts) or empty list
+    """
+    if benefit_group_ids is None:
+        benefit_group_ids = []
+    conn = get_db_connection()
+    try:
+        rs = conn.execute(
+            """
+            SELECT hdb.id, hdb.tenCongTy, hdb.soHopDong, hdb.HLBH_tu, hdb.HLBH_den,
+                   hdb.coPay, COALESCE(sc.mo_ta, '') AS signCF, hdb.mr_app, hdb.isActive
+            FROM hopdong_baohiem hdb
+            LEFT JOIN sign_CF sc ON hdb.sign_CF_id = sc.id
+            WHERE hdb.id = ?
+            LIMIT 1
+            """,
+            [hopdong_id]
+        )
+        rows = rs.rows
+        if not rows:
+            return []
+        details = _to_dicts(rs)[0]
+        contract = {
+            'details': details,
+            'waiting_periods': get_waiting_periods_for_contract(conn, hopdong_id),
+            'benefits': get_benefits_for_contract(conn, hopdong_id, benefit_group_ids),
+            'special_cards': get_special_cards_for_contract(conn, hopdong_id)
+        }
+        return [contract]
+    except Exception as exc:
+        print(f"Error in get_contract_by_id: {exc}")
+        return []
+    finally:
+        pass  # keep connection
+
+# === NEW SEARCH FUNCTION ===
+
+def search_contracts_keyword(search_term: str, benefit_group_ids=None):
+    """Search contracts by a single keyword matching either company name or contract number.
+    Args:
+        search_term: The keyword to look for (partial match).
+        benefit_group_ids: Optional list of benefit group IDs to filter results by.
+    Returns:
+        List of contract dicts with same structure as search_contracts.
+    """
+    if benefit_group_ids is None:
+        benefit_group_ids = []
+
+    conn = get_db_connection()
+    try:
+        base_query = (
+            """
+            SELECT DISTINCT hdb.id, hdb.tenCongTy, hdb.soHopDong, hdb.HLBH_tu, hdb.HLBH_den,
+                            hdb.coPay, COALESCE(sc.mo_ta, '') AS signCF, hdb.mr_app
+            FROM hopdong_baohiem hdb
+            LEFT JOIN sign_CF sc ON hdb.sign_CF_id = sc.id
+            WHERE hdb.isActive = 1 AND (hdb.tenCongTy LIKE ? OR hdb.soHopDong LIKE ?)
+            LIMIT 10
+            """
+        )
+        like_term = f"%{search_term}%"
+        rs = conn.execute(base_query, [like_term, like_term])
+        candidate_contracts = _to_dicts(rs)
+        if not candidate_contracts:
+            return []
+
+        # Optional filtering by benefit groups
+        if benefit_group_ids:
+            placeholders = ', '.join(['?'] * len(benefit_group_ids))
+            filter_q = f"SELECT DISTINCT hopdong_id FROM quyenloi_chitiet WHERE nhom_id IN ({placeholders})"
+            filter_rs = conn.execute(filter_q, benefit_group_ids)
+            valid_ids = {row[0] for row in filter_rs.rows}
+            contracts_to_process = [c for c in candidate_contracts if c['id'] in valid_ids]
+        else:
+            contracts_to_process = candidate_contracts
+
+        results = []
+        for details in contracts_to_process:
+            cid = details['id']
+            results.append({
+                'details': details,
+                'waiting_periods': get_waiting_periods_for_contract(conn, cid),
+                'benefits': get_benefits_for_contract(conn, cid, benefit_group_ids),
+                'special_cards': get_special_cards_for_contract(conn, cid)
+            })
+        return results
+    except Exception as exc:
+        print(f"Error in search_contracts_keyword: {exc}")
+        return []
+    finally:
+        pass  # keep global client open

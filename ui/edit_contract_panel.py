@@ -163,7 +163,7 @@ class EditContractPanel(ttk.Frame):
             Messagebox.show_warning("Vui lòng nhập tiêu chí tìm kiếm.", "Thiếu thông tin")
             return
         try:
-            results = db.search_contracts(company_name=search_term, contract_number=search_term)
+            results = db.search_contracts_keyword(search_term)
             for item in self.tree.get_children():
                 self.tree.delete(item)
             self.contracts_data.clear()
@@ -182,7 +182,7 @@ class EditContractPanel(ttk.Frame):
                     format_date(details.get('HLBH_tu', '')),
                     format_date(details.get('HLBH_den', ''))
                 ))
-            self.status_label.config(text=f"Tìm thấy {len(results)} hợp đồng.", style="info")
+            self.status_label.config(text=f"Tìm thấy {len(results)} hợp đồng.", style="info.TLabel")
         except Exception as e:
             Messagebox.show_error(f"Lỗi khi tìm kiếm: {e}", "Lỗi")
 
@@ -196,7 +196,7 @@ class EditContractPanel(ttk.Frame):
             self.update_contract_info()
             self._populate_forms()
             self.toggle_forms(True)
-            self.status_label.config(text=f"Đã chọn HĐ: {self.current_contract['details']['soHopDong']}", style="info")
+            self.status_label.config(text=f"Đã chọn HĐ: {self.current_contract['details']['soHopDong']}", style="info.TLabel")
 
     def update_contract_info(self):
         for widget in self.contract_info_frame.winfo_children():
@@ -242,9 +242,6 @@ class EditContractPanel(ttk.Frame):
         self.save_waiting_periods_button = ttk.Button(frame, text="Lưu thay đổi Thời gian chờ", command=self.on_save_waiting_periods)
         self.save_waiting_periods_button.grid(row=1, column=0, columnspan=2, pady=10)
 
-    def _create_special_cards_tab(self):
-        ttk.Label(self.tab_special, text="Chức năng đang được phát triển.").pack(pady=20)
-
     def _fetch_data(self):
         try:
             waiting_times_data = db.get_all_waiting_times()
@@ -256,6 +253,12 @@ class EditContractPanel(ttk.Frame):
             self.waiting_time_id_to_text_map, self.waiting_time_text_to_id_map, self.waiting_time_options = {}, {}, []
 
     def _populate_special_cards_tab(self):
+        # Ensure the scrollable frame is present; if not, create tab UI.
+        if self.sc_scrollable_frame is None:
+            self._create_special_cards_tab()
+            if self.sc_scrollable_frame is None:
+                return  # Bail out if still missing
+
         for widget in self.special_card_rows:
             widget.destroy()
         self.special_card_rows.clear()
@@ -271,6 +274,16 @@ class EditContractPanel(ttk.Frame):
         canvas.configure(scrollregion=canvas.bbox("all"))
 
     def _add_special_card_row(self, number="", holder="", notes=""):
+        # Ensure scrollable frame exists (it may be None if the tab has not been
+        # initialised yet due to earlier errors). This prevents TclError caused
+        # by falling back to the root window and mixing pack/grid geometry
+        # managers.
+        if self.sc_scrollable_frame is None:
+            # Lazily (re)create the special-cards tab container
+            self._create_special_cards_tab()
+            if self.sc_scrollable_frame is None:
+                # Still failed – give up quietly
+                return
         row_frame = ttk.Frame(self.sc_scrollable_frame)
         row_frame.pack(fill="x", expand=True, pady=2, padx=5)
 
@@ -340,7 +353,7 @@ class EditContractPanel(ttk.Frame):
                     return
                 seen_cards.add(card_number)
 
-                cards_to_save.append({"number": card_number, "holder_name": holder_name, "notes": notes})
+                cards_to_save.append({"so_the": card_number, "ten_NDBH": holder_name, "ghi_chu": notes})
             
             db.update_contract_special_cards(self.current_contract['details']['id'], cards_to_save)
             Messagebox.show_info("Đã lưu thành công thẻ đặc biệt!", "Thành công")
@@ -559,7 +572,7 @@ class EditContractPanel(ttk.Frame):
             return
         try:
             contract_id = self.current_contract['details']['id']
-            updated_contracts = db.search_contracts(contract_id=contract_id)
+            updated_contracts = db.get_contract_by_id(contract_id)
             if updated_contracts:
                 self.contracts_data[str(contract_id)] = updated_contracts[0]
                 self.current_contract = updated_contracts[0]
