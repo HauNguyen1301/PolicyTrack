@@ -1,7 +1,7 @@
 import tkinter as tk
 import ttkbootstrap as ttk
 from ttkbootstrap.dialogs import Messagebox
-import database_alter as db
+import database as db
 from utils.date_utils import format_date, format_date_range, _to_date
 
 class EditContractPanel(ttk.Frame):
@@ -14,6 +14,11 @@ class EditContractPanel(ttk.Frame):
         self.special_card_rows = []
         self.sc_scrollable_frame = None
         self.save_special_cards_button = None
+
+        # Biến cho toggle trạng thái
+        self.is_active_var = tk.BooleanVar()
+        # Biến cho combobox trạng thái tìm kiếm
+        self.search_status_var = tk.StringVar(value="Hoạt động")
 
         self._fetch_data()
         
@@ -64,6 +69,16 @@ class EditContractPanel(ttk.Frame):
         search_btn = ttk.Button(search_frame, text="Tìm", command=self.search_contract, bootstyle="light")
         search_btn.grid(row=1, column=1, padx=(0, 2))
 
+        # Combobox để chọn trạng thái hợp đồng
+        ttk.Label(search_frame, text="Trạng thái:").grid(row=2, column=0, padx=2, pady=(5, 2), sticky="w")
+        self.status_combobox = ttk.Combobox(
+            search_frame,
+            textvariable=self.search_status_var,
+            values=["Hoạt động", "Không hoạt động", "Tất cả"],
+            state="readonly"
+        )
+        self.status_combobox.grid(row=3, column=0, columnspan=2, sticky="ew", pady=(0, 5))
+
     def _create_results_panel(self):
         results_frame = ttk.LabelFrame(self.main_container, text="Kết quả tìm kiếm", padding=10, bootstyle="info")
         results_frame.grid(row=0, column=1, sticky="nsew", padx=5, pady=(0, 5))
@@ -86,10 +101,10 @@ class EditContractPanel(ttk.Frame):
         y_scrollbar.config(command=self.tree.yview)
         x_scrollbar.config(command=self.tree.xview)
         
-        self.tree.column("Số HĐ", width=120, anchor="w")
-        self.tree.column("Công ty", width=250, anchor="w")
-        self.tree.column("Từ ngày", width=100, anchor="center")
-        self.tree.column("Đến ngày", width=100, anchor="center")
+        self.tree.column("Số HĐ", width=100, anchor="w")
+        self.tree.column("Công ty", width=200, anchor="w")
+        self.tree.column("Từ ngày", width=80, anchor="center")
+        self.tree.column("Đến ngày", width=80, anchor="center")
         
         for col in columns:
             self.tree.heading(col, text=col)
@@ -163,13 +178,28 @@ class EditContractPanel(ttk.Frame):
             Messagebox.show_warning("Vui lòng nhập tiêu chí tìm kiếm.", "Thiếu thông tin")
             return
         try:
-            results = db.search_contracts_keyword(search_term)
+            # Lấy trạng thái từ combobox và chuyển đổi nó
+            status_map = {
+                "Hoạt động": "active",
+                "Không hoạt động": "inactive",
+                "Tất cả": "all"
+            }
+            selected_status_display = self.search_status_var.get()
+            status_value = status_map.get(selected_status_display, 'active')
+
+            results = db.search_contracts(
+                company_name=search_term,
+                contract_number=search_term,
+                status=status_value
+            )
+
             for item in self.tree.get_children():
                 self.tree.delete(item)
             self.contracts_data.clear()
 
             if not results:
                 Messagebox.show_info("Không tìm thấy hợp đồng phù hợp.", "Thông báo")
+                self.toggle_forms(False)
                 return
 
             for contract in results:
@@ -202,15 +232,59 @@ class EditContractPanel(ttk.Frame):
         for widget in self.contract_info_frame.winfo_children():
             widget.destroy()
         details = self.current_contract['details']
-        fields = {
+        self.contract_info_frame.columnconfigure(2, weight=0) # Cột cho nút Lưu
+
+        # Các trường thông tin tĩnh
+        static_fields = {
             "Số HĐ:": details.get('soHopDong', 'N/A'),
             "Công ty:": details.get('tenCongTy', 'N/A'),
             "Hiệu lực:": format_date_range(details.get('HLBH_tu'), details.get('HLBH_den')),
-            "Tình trạng:": "Hoạt động" if details.get('isActive') else "Không hoạt động"
         }
-        for i, (label, value) in enumerate(fields.items()):
+        for i, (label, value) in enumerate(static_fields.items()):
             ttk.Label(self.contract_info_frame, text=label, font=("Arial", 9, "bold")).grid(row=i, column=0, sticky="w", padx=5, pady=2)
-            ttk.Label(self.contract_info_frame, text=value, wraplength=180).grid(row=i, column=1, sticky="w", padx=5, pady=2)
+            ttk.Label(self.contract_info_frame, text=value, wraplength=180).grid(row=i, column=1, sticky="w", padx=5, pady=2, columnspan=2)
+
+        # Tình trạng với toggle switch
+        status_row = len(static_fields)
+        ttk.Label(self.contract_info_frame, text="Tình trạng:", font=("Arial", 9, "bold")).grid(row=status_row, column=0, sticky="w", padx=5, pady=5)
+        
+        self.is_active_var.set(int(details.get('isActive', 0)) == 1)
+        status_toggle = ttk.Checkbutton(
+            self.contract_info_frame, 
+            variable=self.is_active_var, 
+            bootstyle="success-round-toggle",
+            onvalue=True, 
+            offvalue=False
+        )
+        status_toggle.grid(row=status_row, column=1, sticky="w", padx=5, pady=5)
+
+        save_status_button = ttk.Button(
+            self.contract_info_frame, 
+            text="Lưu", 
+            command=self._save_active_status,
+            bootstyle="success-outline",
+            width=5
+        )
+        save_status_button.grid(row=status_row, column=2, sticky="e", padx=5, pady=5)
+
+    def _save_active_status(self):
+        if not self.current_contract:
+            Messagebox.show_warning("Chưa chọn hợp đồng.", "Lỗi")
+            return
+
+        contract_id = self.current_contract['details']['id']
+        new_status = 1 if self.is_active_var.get() else 0
+
+        success, message = db.update_contract_status(contract_id, new_status)
+
+        if success:
+            Messagebox.show_info("Cập nhật trạng thái thành công.", "Thành công")
+            # Cập nhật lại dữ liệu local để UI đồng bộ
+            self.current_contract['details']['isActive'] = new_status
+            # Làm mới lại danh sách kết quả tìm kiếm để phản ánh thay đổi (nếu cần)
+            self.search_contract()
+        else:
+            Messagebox.show_error(f"Lỗi khi cập nhật: {message}", "Lỗi")
 
     def _create_general_info_tab(self):
         frame = self.tab_general
@@ -225,6 +299,9 @@ class EditContractPanel(ttk.Frame):
             ttk.Entry(frame, textvariable=var).grid(row=i, column=1, sticky="ew", padx=5, pady=5)
         self.save_general_info_button = ttk.Button(frame, text="Lưu thay đổi chung", command=self._save_general_info_changes)
         self.save_general_info_button.grid(row=len(self.edit_fields), column=0, columnspan=2, pady=10)
+
+        self.toggle_status_button = ttk.Button(frame, text="Thay đổi trạng thái", command=self._toggle_active_status)
+        self.toggle_status_button.grid(row=len(self.edit_fields) + 1, column=0, columnspan=2, pady=5)
 
     def _create_waiting_periods_tab(self):
         frame = self.tab_waiting
@@ -525,6 +602,33 @@ class EditContractPanel(ttk.Frame):
 
         except Exception as e:
             Messagebox.show_error(f"Đã xảy ra lỗi không mong muốn: {e}", "Lỗi hệ thống")
+
+    def _toggle_active_status(self):
+        if not self.current_contract:
+            Messagebox.show_warning("Vui lòng chọn một hợp đồng.", "Chưa chọn hợp đồng")
+            return
+
+        details = self.current_contract['details']
+        contract_id = details.get('id')
+        current_status = details.get('isActive')
+        new_status = 0 if current_status == 1 else 1
+        
+        status_text = "hủy kích hoạt" if new_status == 0 else "kích hoạt"
+
+        confirmed = Messagebox.okcancel(
+            f"Bạn có chắc chắn muốn {status_text} hợp đồng {details.get('soHopDong')} không?",
+            "Xác nhận thay đổi"
+        )
+
+        if not confirmed:
+            return
+
+        try:
+            db.update_contract_status(contract_id, new_status)
+            self.refresh_current_contract_data()
+            Messagebox.show_info(f"Đã {status_text} hợp đồng thành công.", "Thành công")
+        except Exception as e:
+            Messagebox.show_error(f"Lỗi khi cập nhật trạng thái: {e}", "Lỗi")
 
     def on_save_waiting_periods(self):
         if not self.current_contract:

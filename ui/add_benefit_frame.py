@@ -257,11 +257,7 @@ class AddBenefitFrame(ttk.Frame):
             return
 
         try:
-            # Tìm theo tên công ty trước
-            results = db.search_contracts(company_name=search_term, contract_number='')
-            # Nếu không thấy, thử tìm theo số hợp đồng
-            if not results:
-                results = db.search_contracts(company_name='', contract_number=search_term)
+            results = db.search_contracts(company_name=search_term, contract_number=search_term)
             
             # Clear previous results from tree and data store
             for item in self.tree.get_children():

@@ -22,6 +22,7 @@ class CheckContractPanel(ttk.Frame):
         title_label.pack(pady=(10, 20))
 
         self.benefit_vars = {} # Dictionary để lưu {group_id: BooleanVar}
+        self.displayed_contracts = {} # Dictionary để lưu {contract_id: contract_data}
 
         # --- Khung tìm kiếm ---
         search_frame = ttk.LabelFrame(self, text="Tiêu chí tìm kiếm", padding="10", bootstyle="info")
@@ -82,6 +83,9 @@ class CheckContractPanel(ttk.Frame):
         self.result_text.pack(side='left', fill='both', expand=True)
         text_scrollbar_y.pack(side='right', fill='y')
 
+        # Gán sự kiện click
+        self.result_text.bind("<Button-1>", self._on_result_click)
+
         # Thiết lập tag cho việc định dạng
         self.result_text.tag_configure("header", font=("Segoe UI", 11, "bold"))
         self.result_text.tag_configure("subheader", font=("Segoe UI", 10, "italic"))
@@ -99,108 +103,200 @@ class CheckContractPanel(ttk.Frame):
 
 
     def perform_search(self):
-        self.result_text.tag_configure("benefit", font=("Segoe UI", 10))
-        self.result_text.tag_configure("db_bold", font=("Segoe UI", 10, "bold"))
         """Thực hiện tìm kiếm và hiển thị kết quả."""
-        # Xóa kết quả cũ và chuyển sang chế độ chỉnh sửa
         self.result_text.config(state='normal')
         self.result_text.delete('1.0', tk.END)
+        self.displayed_contracts.clear() # Xóa dữ liệu hợp đồng cũ
 
-        # Lấy các tiêu chí tìm kiếm
         company_name = self.company_entry.get().strip()
         contract_number = self.contract_entry.get().strip()
         selected_group_ids = [group_id for group_id, var in self.benefit_vars.items() if var.get()]
 
-        # Kiểm tra điều kiện tìm kiếm
-        if not company_name and not contract_number and not selected_group_ids:
-            Messagebox.show_warning("Vui lòng nhập ít nhất một tiêu chí tìm kiếm.", "Cảnh báo",parent=self)
+        if not any([company_name, contract_number, selected_group_ids]):
+            Messagebox.show_warning("Vui lòng nhập ít nhất một tiêu chí tìm kiếm.", "Cảnh báo", parent=self)
             return
 
-        results = database.search_contracts(company_name, contract_number, selected_group_ids)
+        try:
+            results = database.search_contracts(company_name, contract_number, selected_group_ids)
+            if not results:
+                Messagebox.show_info("Không tìm thấy hợp đồng nào phù hợp.", "Thông báo", parent=self)
+            else:
+                for i, contract_data in enumerate(results):
+                    contract_id = contract_data.get('details', {}).get('id')
+                    if contract_id:
+                        self.displayed_contracts[contract_id] = contract_data
+                    self._display_single_contract(contract_data)
+                    if i < len(results) - 1:
+                        self.result_text.insert(tk.END, "-" * 80 + "\n", "separator")
+        except Exception as e:
+            Messagebox.show_error(f"Đã xảy ra lỗi khi tìm kiếm: {e}", "Lỗi", parent=self)
+            print(f"Search error: {e}")
 
-        if not results:
-            Messagebox.show_info( "Không tìm thấy hợp đồng nào phù hợp.","Thông báo", parent=self)
-        else:
-            for i, contract_data in enumerate(results):
-                details = contract_data['details']
-                waiting_periods = contract_data['waiting_periods']
-                benefits = contract_data.get('benefits', [])  # Sử dụng get với giá trị mặc định là list rỗng
-                special_cards = contract_data.get('special_cards', [])  # Lấy dữ liệu thẻ đặc biệt
-
-                # Định dạng ngày tháng
-                hlbh_tu = format_date(details['HLBH_tu'])
-                hlbh_den = format_date(details['HLBH_den'])
-
-                # Dòng tiêu đề hợp đồng
-                header = f"{details['tenCongTy']} - {details['soHopDong']} (HL: {hlbh_tu} -> {hlbh_den})\n"
-                self.result_text.insert(tk.END, header, "header")
-
-                # Thẻ đặc biệt
-                if special_cards:
-                    self.result_text.insert(tk.END, "- Thẻ đặc biệt:\n", "subheader")
-                    for card in special_cards:
-                        card_info = f"  + {card['ten_NDBH']} (Số thẻ: {card['so_the']})"
-                        if card['ghi_chu']:
-                            card_info += f" - Ghi chú: {card['ghi_chu']}"
-                        self.result_text.insert(tk.END, card_info + "\n", "special_card")
-                
-                # 2. Định dạng Co-pay và SignCF (italic chỉ giá trị phù hợp)
-                copay_value = details['coPay']
-                # Nhãn Co-pay
-                self.result_text.insert(tk.END, "- Co-pay: ", "benefit")
-                # Giá trị Co-pay in nghiêng (luôn luôn)
-                self.result_text.insert(
-                    tk.END,
-                    (f"{int(float(copay_value))}%" if str(copay_value).replace('.', '', 1).isdigit() else str(copay_value)) if copay_value else "N/A",
-                    "db_bold"
-                )
-
-                # Nhãn XN GYCTT
-                self.result_text.insert(tk.END, " | XN GYCTT: ", "benefit")
-                signcf_val = details['signCF'] if details['signCF'] else "N/A"
-                # Điều kiện: nếu value chứa cả '&' và 'ký' thì KHÔNG in nghiêng
-                if "&" in signcf_val and "ký" in signcf_val.lower():
-                    value_tag = "benefit"
-                else:
-                    value_tag = "db_value"
-                self.result_text.insert(tk.END, signcf_val, value_tag)
-                # Xuống dòng
-                self.result_text.insert(tk.END, "\n", "benefit")
-                
-                # Thời gian chờ
-                if waiting_periods:
-                    self.result_text.insert(tk.END, "- Thời gian chờ:\n", "subheader")
-                    for period in waiting_periods:
-                        # Đảm bảo các key tồn tại trước khi truy cập
-                        loai_cho = period.get('loai_cho', 'N/A')
-                        gia_tri = period.get('gia_tri', 'N/A')
-                        self.result_text.insert(tk.END, f"  + {loai_cho}: {gia_tri}\n", "benefit")
-
-                # Hiển thị thông tin MR App nếu có
-                mr_app_info = details.get('mr_app')
-                if mr_app_info and mr_app_info.strip() and mr_app_info.strip().lower() != 'không':
-                    self.result_text.insert(tk.END, "- MR App BVDirect: ", "subheader")
-                    self.result_text.insert(tk.END, f"{mr_app_info.strip()}\n", "db_value")
-
-                # Danh sách quyền lợi
-                if benefits:
-                    self.result_text.insert(tk.END, "- Quyền lợi:\n", "subheader")
-                    for benefit_row in sorted(benefits, key=lambda x: x['ten_quyenloi']):
-                        ten_ql = benefit_row.get('ten_quyenloi', 'N/A')
-                        han_muc_val = benefit_row.get('han_muc')
-                        mo_ta_val = benefit_row.get('mo_ta', '')
-
-                        han_muc = f"{han_muc_val:,.0f}" if isinstance(han_muc_val, (int, float)) else str(han_muc_val)
-                        mo_ta = f"({mo_ta_val})" if mo_ta_val else ""
-                        self.result_text.insert(tk.END, f"  + {ten_ql}: ", "benefit")
-                        self.result_text.insert(tk.END, f"{han_muc} ", "db_bold")
-                        self.result_text.insert(tk.END, f"{mo_ta}\n", "db_value")
-                
-
-                
-                # Thêm dòng phân cách giữa các hợp đồng
-                if i < len(results) - 1:
-                    self.result_text.insert(tk.END, "-" * 80 + "\n", "separator")
-
-        # Chuyển về chế độ chỉ đọc
         self.result_text.config(state='disabled')
+
+    def _display_single_contract(self, contract_data):
+        """Hiển thị thông tin chi tiết cho một hợp đồng."""
+        details = contract_data.get('details', {})
+        self._display_header(details)
+        self._display_special_cards(contract_data.get('special_cards', []))
+        self._display_meta_info(details)
+        self._display_waiting_periods(contract_data.get('waiting_periods', []))
+        self._display_mr_app(details)
+        self._display_benefits(contract_data.get('benefits', []))
+
+    def _display_header(self, details):
+        """Hiển thị tiêu đề chính của hợp đồng, thêm dấu check nếu đã xác thực."""
+        contract_id = details.get('id')
+        is_verified = details.get('verify_by') is not None
+
+        check_mark = "✓ " if is_verified else ""
+
+        hlbh_tu = format_date(details.get('HLBH_tu'))
+        hlbh_den = format_date(details.get('HLBH_den'))
+        header = f"{check_mark}{details.get('tenCongTy', 'N/A')} - {details.get('soHopDong', 'N/A')} (HL: {hlbh_tu} -> {hlbh_den})\n"
+        
+        # Thêm tag chung và tag riêng cho từng hợp đồng
+        header_tags = ("header", f"contract_{contract_id}")
+        self.result_text.insert(tk.END, header, header_tags)
+
+    def _display_special_cards(self, special_cards):
+        """Hiển thị danh sách thẻ đặc biệt."""
+        if not special_cards:
+            return
+        self.result_text.insert(tk.END, "- Thẻ đặc biệt:\n", "subheader")
+        for card in special_cards:
+            card_info = f"  + {card.get('ten_NDBH', 'N/A')} (Số thẻ: {card.get('so_the', 'N/A')})"
+            if card.get('ghi_chu'):
+                card_info += f" - Ghi chú: {card['ghi_chu']}"
+            self.result_text.insert(tk.END, card_info + "\n", "special_card")
+
+    def _display_meta_info(self, details):
+        """Hiển thị thông tin Co-pay và SignCF."""
+        copay_value = details.get('coPay')
+        copay_display = "N/A"
+        if copay_value:
+            try:
+                copay_display = f"{int(float(copay_value))}%"
+            except (ValueError, TypeError):
+                copay_display = str(copay_value)
+        
+        self.result_text.insert(tk.END, "- Co-pay: ", "benefit")
+        self.result_text.insert(tk.END, copay_display, "db_bold")
+
+        signcf_val = details.get('signCF', "N/A")
+        value_tag = "db_value" if "&" not in signcf_val or "ký" not in signcf_val.lower() else "benefit"
+        self.result_text.insert(tk.END, " | XN GYCTT: ", "benefit")
+        self.result_text.insert(tk.END, signcf_val, value_tag)
+        self.result_text.insert(tk.END, "\n", "benefit")
+
+    def _display_waiting_periods(self, waiting_periods):
+        """Hiển thị các quy định về thơi gian chờ."""
+        if not waiting_periods:
+            return
+        self.result_text.insert(tk.END, "- Thời gian chờ:\n", "subheader")
+        for period in waiting_periods:
+            line = f"  + {period.get('loai_cho', 'N/A')}: {period.get('gia_tri', 'N/A')}\n"
+            self.result_text.insert(tk.END, line, "benefit")
+
+    def _display_mr_app(self, details):
+        """Hiển thị thông tin về MR App."""
+        mr_app_info = details.get('mr_app', '').strip()
+        if mr_app_info and mr_app_info.lower() != 'không':
+            self.result_text.insert(tk.END, "- MR App BVDirect: ", "subheader")
+            self.result_text.insert(tk.END, f"{mr_app_info}\n", "db_value")
+
+    def _display_benefits(self, benefits):
+        """Hiển thị danh sách quyền lợi chi tiết."""
+        if not benefits:
+            return
+        self.result_text.insert(tk.END, "- Quyền lợi:\n", "subheader")
+        for benefit_row in sorted(benefits, key=lambda x: x.get('ten_quyenloi', '')):
+            ten_ql = benefit_row.get('ten_quyenloi', 'N/A')
+            han_muc_val = benefit_row.get('han_muc')
+            mo_ta_val = benefit_row.get('mo_ta', '')
+
+            han_muc = f"{han_muc_val:,.0f}" if isinstance(han_muc_val, (int, float)) else str(han_muc_val)
+            mo_ta = f"({mo_ta_val})" if mo_ta_val else ""
+            
+            self.result_text.insert(tk.END, f"  + {ten_ql}: ", "benefit")
+            self.result_text.insert(tk.END, f"{han_muc} ", "db_bold")
+            self.result_text.insert(tk.END, f"{mo_ta}\n", "db_value")
+
+    def _on_result_click(self, event):
+        """Xử lý sự kiện khi người dùng click vào kết quả tìm kiếm."""
+        try:
+            index = self.result_text.index(f"@{event.x},{event.y}")
+            tags = self.result_text.tag_names(index)
+
+            contract_id = None
+            for tag in tags:
+                if tag.startswith("contract_"):
+                    contract_id = int(tag.split('_')[1])
+                    break
+            
+            if contract_id and contract_id in self.displayed_contracts:
+                self._show_verification_popup(contract_id)
+
+        except (tk.TclError, ValueError, IndexError):
+            # Bỏ qua lỗi khi click vào vùng trống hoặc tag không hợp lệ
+            pass
+
+    def _show_verification_popup(self, contract_id):
+        """Hiển thị popup xác thực hoặc thông báo nếu đã được xác thực."""
+        contract_data = self.displayed_contracts[contract_id]
+        details = contract_data.get('details', {})
+
+        # 1. Kiểm tra nếu đã được xác thực
+        if details.get('verify_by') is not None:
+            Messagebox.show_info(
+                title="Đã xác thực",
+                message="Hợp đồng này đã được xác thực trước đó.",
+                parent=self
+            )
+            return # Dừng lại, không hiển thị popup
+
+        # 2. Nếu chưa, hiển thị popup như bình thường
+        company_name = details.get('tenCongTy', 'N/A')
+        contract_number = details.get('soHopDong', 'N/A')
+
+        # Tạo cửa sổ Toplevel
+        popup = ttk.Toplevel(master=self, title="Xác thực hợp đồng")
+        popup.transient(self) # Giữ popup luôn ở trên cửa sổ chính
+        popup.grab_set() # Chặn tương tác với cửa sổ chính
+        popup.geometry("400x150")
+
+        main_frame = ttk.Frame(popup, padding=15)
+        main_frame.pack(expand=True, fill='both')
+
+        info_text = f"Công ty: {company_name}\nSố HĐ: {contract_number}"
+        ttk.Label(main_frame, text=info_text, justify='left').pack(pady=10, anchor='w')
+
+        def on_verify():
+            answer = Messagebox.yesno(
+                title="Xác nhận",
+                message=f"Bạn có chắc chắn muốn xác thực hợp đồng này cho công ty {company_name}?",
+                parent=popup
+            )
+            if answer == "Yes":
+                user_id = self.controller.current_user.get('id')
+                if not user_id:
+                    Messagebox.show_error("Không tìm thấy thông tin người dùng.", parent=popup)
+                    return
+
+                success, message = database.update_contract_verification(contract_id, user_id)
+                if success:
+                    Messagebox.show_info(message, parent=popup)
+                    popup.destroy()
+                else:
+                    Messagebox.show_error(message, parent=popup)
+            else:
+                popup.destroy()
+
+        button_frame = ttk.Frame(main_frame)
+        button_frame.pack(side='bottom', fill='x', pady=10)
+
+        verify_button = ttk.Button(button_frame, text="VERIFY", command=on_verify, bootstyle="success")
+        verify_button.pack(side='right', padx=5)
+
+        cancel_button = ttk.Button(button_frame, text="Hủy", command=popup.destroy, bootstyle="secondary")
+        cancel_button.pack(side='right')
