@@ -1,7 +1,7 @@
 import tkinter as tk
 import ttkbootstrap as ttk
 from ttkbootstrap.dialogs import Messagebox
-import database as db
+import database_alter as db
 from utils.date_utils import format_date, format_date_range, _to_date
 
 class EditContractPanel(ttk.Frame):
@@ -58,11 +58,11 @@ class EditContractPanel(ttk.Frame):
         ttk.Label(search_frame, text="Số HĐ/Tên công ty:").grid(row=0, column=0, padx=2, pady=2, sticky="w")
         self.search_var = tk.StringVar()
         self.search_entry = ttk.Entry(search_frame, textvariable=self.search_var, width=25)
-        self.search_entry.grid(row=0, column=1, sticky="ew", padx=(0, 5))
+        self.search_entry.grid(row=1, column=0, sticky="ew", padx=(0, 5))
         self.search_entry.bind('<Return>', lambda e: self.search_contract())
         
         search_btn = ttk.Button(search_frame, text="Tìm", command=self.search_contract, bootstyle="light")
-        search_btn.grid(row=0, column=2, padx=(0, 2))
+        search_btn.grid(row=1, column=1, padx=(0, 2))
 
     def _create_results_panel(self):
         results_frame = ttk.LabelFrame(self.main_container, text="Kết quả tìm kiếm", padding=10, bootstyle="info")

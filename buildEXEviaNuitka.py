@@ -33,7 +33,7 @@ import certifi
 PROJECT_ROOT = Path(__file__).resolve().parent
 ENTRY_SCRIPT = PROJECT_ROOT / "main.py"
 # Use version string for output exe name (spaces removed for compatibility)
-DEFAULT_EXE_NAME = f"PolicyTrack"
+DEFAULT_EXE_NAME = f"PolicyTrack-{__version__}.exe"
 
 
 def run(cmd: List[str]):

@@ -15,3 +15,4 @@ Sử dụng checkbox `[ ]` / `[x]` để đánh dấu tình trạng hoàn thành
 - [x] Change UI with ttkbootstrap. 06/07/2025 10:40
 - [x] New thời gian chờ không tự cập nhật lại list - Đã sửa trong `add_contract_frame.py` (08/07/2025)
 - [x] contract_view_panel - lỗi không hiển thị thời gian chờ + mở rộng app - Mã nguồn đã đúng, vấn đề có thể do dữ liệu (08/07/2025)
+- [x] UPDATE DATABASE LOG TABLE
