@@ -98,6 +98,7 @@ def main():
         f"--include-data-files={certifi.where()}=certifi/cacert.pem",
         "--include-data-files=utils/*=utils/",
         "--include-data-files=ui/*=ui/",
+        "--include-data-files=image/*=image/",
         "--include-module=internal_env",
         f"--output-filename={output_name}",
         "--nofollow-import-to=tests,__pycache__",
