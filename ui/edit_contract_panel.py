@@ -268,7 +268,7 @@ class EditContractPanel(ttk.Frame):
 
         save_status_button = ttk.Button(
             self.contract_info_frame, 
-            text="Lưu", 
+            text="Đổi trạng thái", 
             command=self._save_active_status,
             bootstyle="success-outline",
             width=5
@@ -655,11 +655,9 @@ class EditContractPanel(ttk.Frame):
                 if not gia_tri_str:
                     Messagebox.show_warning(f"Vui lòng nhập giá trị cho '{loai_cho_text}'.", "Thiếu thông tin")
                     return
-                try:
-                    gia_tri_val = int(gia_tri_str)
-                except ValueError:
-                    Messagebox.show_warning(f"Giá trị cho '{loai_cho_text}' phải là một con số.", "Dữ liệu không hợp lệ")
-                    return
+                
+                # Lưu giá trị text mà không cần chuyển đổi
+                gia_tri_val = gia_tri_str
 
                 # 2. Kiểm tra loại thời gian chờ hợp lệ và trùng lặp
                 cho_id = self.waiting_time_text_to_id_map.get(loai_cho_text)
@@ -684,9 +682,9 @@ class EditContractPanel(ttk.Frame):
             return
         try:
             contract_id = self.current_contract['details']['id']
-            updated_contracts = db.get_contract_by_id(contract_id)
-            if updated_contracts:
-                self.contracts_data[str(contract_id)] = updated_contracts[0]
-                self.current_contract = updated_contracts[0]
+            updated_contract = db.get_contract_details_by_id(contract_id)
+            if updated_contract:
+                self.contracts_data[str(contract_id)] = updated_contract
+                self.current_contract = updated_contract
         except Exception as e:
             print(f"Error refreshing contract data: {e}")

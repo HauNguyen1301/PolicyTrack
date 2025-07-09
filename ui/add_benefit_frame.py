@@ -262,12 +262,12 @@ class AddBenefitFrame(ttk.Frame):
                 self.tree.delete(item)
             self.contracts_data.clear()
 
-            # Tìm kiếm dựa trên số hợp đồng
-            results = db.search_contracts(contract_number=search_term)
+            # Tìm kiếm dựa trên số hợp đồng với status='all'
+            results = db.search_contracts(contract_number=search_term, status='all')
             
-            # Nếu không tìm thấy, thử tìm kiếm dựa trên tên công ty
+            # Nếu không tìm thấy, thử tìm kiếm dựa trên tên công ty với status='all'
             if not results:
-                results = db.search_contracts(company_name=search_term)
+                results = db.search_contracts(company_name=search_term, status='all')
                 
             if not results:
                 Messagebox.show_info("Không tìm thấy hợp đồng nào phù hợp", "Thông báo")

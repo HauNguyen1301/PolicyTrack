@@ -2,5 +2,5 @@
 Increment `__version__` every time you release a new build.
 """
 
-__version__ = "0.2.2rc1"
-__version_date__ = "2025-07-08"
+__version__ = "0.2.2rc2"
+__version_date__ = "2025-07-09"

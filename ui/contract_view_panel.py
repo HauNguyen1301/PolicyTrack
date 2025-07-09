@@ -59,8 +59,17 @@ class CheckContractPanel(ttk.Frame):
         # Nút tìm kiếm
         search_button_frame = ttk.Frame(search_frame)
         search_button_frame.grid(row=2, column=0, columnspan=4, pady=10, sticky='e')
+        
+        # Add instruction label
+        instruction_label = ttk.Label(search_button_frame, 
+            text="Double click vào hợp đồng để xác thực thông tin lần 2",
+            font=("Arial", 10, "italic"),
+            foreground="gray"
+        )
+        instruction_label.pack(side='left', padx=(0, 10))
+        
         search_button = ttk.Button(search_button_frame, text="Tìm kiếm",bootstyle="outline-info", command=self.perform_search)
-        search_button.pack()
+        search_button.pack(side='right')
         
         # Bind Enter key to perform search
         search_button.bind('<Return>', lambda e: self.perform_search())
@@ -112,12 +121,28 @@ class CheckContractPanel(ttk.Frame):
         contract_number = self.contract_entry.get().strip()
         selected_group_ids = [group_id for group_id, var in self.benefit_vars.items() if var.get()]
 
-        if not any([company_name, contract_number, selected_group_ids]):
-            Messagebox.show_warning("Vui lòng nhập ít nhất một tiêu chí tìm kiếm.", "Cảnh báo", parent=self)
+        # Kiểm tra xem có nhập ít nhất một trong hai entry không
+        if not company_name and not contract_number:
+            Messagebox.show_warning("Vui lòng nhập ít nhất một trong hai tiêu chí: Tên công ty hoặc Số HĐ.", "Cảnh báo", parent=self)
             return
 
         try:
-            results = database.search_contracts(company_name, contract_number, selected_group_ids)
+            # Lấy tất cả kết quả không phân biệt nhóm quyền lợi
+            results = database.search_contracts(company_name, contract_number, [])
+            
+            # Nếu có nhóm quyền lợi được chọn, lọc lại kết quả
+            if selected_group_ids:
+                filtered_results = []
+                for result in results:
+                    # Kiểm tra xem hợp đồng có quyền lợi thuộc các nhóm được chọn không
+                    has_selected_benefit = any(
+                        benefit.get('nhom_id') in selected_group_ids 
+                        for benefit in result.get('benefits', [])
+                    )
+                    if has_selected_benefit:
+                        filtered_results.append(result)
+                results = filtered_results
+
             if not results:
                 Messagebox.show_info("Không tìm thấy hợp đồng nào phù hợp.", "Thông báo", parent=self)
             else:
@@ -125,16 +150,16 @@ class CheckContractPanel(ttk.Frame):
                     contract_id = contract_data.get('details', {}).get('id')
                     if contract_id:
                         self.displayed_contracts[contract_id] = contract_data
-                    self._display_single_contract(contract_data)
+                    self._display_single_contract(contract_data, selected_group_ids)
                     if i < len(results) - 1:
                         self.result_text.insert(tk.END, "-" * 80 + "\n", "separator")
         except Exception as e:
             Messagebox.show_error(f"Đã xảy ra lỗi khi tìm kiếm: {e}", "Lỗi", parent=self)
             print(f"Search error: {e}")
+        finally:
+            self.result_text.config(state='disabled')
 
-        self.result_text.config(state='disabled')
-
-    def _display_single_contract(self, contract_data):
+    def _display_single_contract(self, contract_data, selected_group_ids=None):
         """Hiển thị thông tin chi tiết cho một hợp đồng."""
         details = contract_data.get('details', {})
         self._display_header(details)
@@ -142,7 +167,7 @@ class CheckContractPanel(ttk.Frame):
         self._display_meta_info(details)
         self._display_waiting_periods(contract_data.get('waiting_periods', []))
         self._display_mr_app(details)
-        self._display_benefits(contract_data.get('benefits', []))
+        self._display_benefits(contract_data.get('benefits', []), selected_group_ids)
 
     def _display_header(self, details):
         """Hiển thị tiêu đề chính của hợp đồng, thêm dấu check nếu đã xác thực."""
@@ -205,20 +230,34 @@ class CheckContractPanel(ttk.Frame):
             self.result_text.insert(tk.END, "- MR App BVDirect: ", "subheader")
             self.result_text.insert(tk.END, f"{mr_app_info}\n", "db_value")
 
-    def _display_benefits(self, benefits):
+    def _display_benefits(self, benefits, selected_group_ids=None):
         """Hiển thị danh sách quyền lợi chi tiết."""
         if not benefits:
             return
+            
+        # Nếu có nhóm quyền lợi được chọn, lọc quyền lợi
+        if selected_group_ids:
+            benefits = [benefit for benefit in benefits 
+                       if benefit.get('nhom_id') in selected_group_ids]
+            
+        if not benefits:
+            self.result_text.insert(tk.END, "- Không có quyền lợi phù hợp\n", "subheader")
+            return
+            
         self.result_text.insert(tk.END, "- Quyền lợi:\n", "subheader")
         for benefit_row in sorted(benefits, key=lambda x: x.get('ten_quyenloi', '')):
             ten_ql = benefit_row.get('ten_quyenloi', 'N/A')
             han_muc_val = benefit_row.get('han_muc')
             mo_ta_val = benefit_row.get('mo_ta', '')
+            nhom_id = benefit_row.get('nhom_id')  # Lấy nhom_id
 
             han_muc = f"{han_muc_val:,.0f}" if isinstance(han_muc_val, (int, float)) else str(han_muc_val)
             mo_ta = f"({mo_ta_val})" if mo_ta_val else ""
             
-            self.result_text.insert(tk.END, f"  + {ten_ql}: ", "benefit")
+            # Tạo tag riêng cho từng quyền lợi dựa trên nhom_id
+            benefit_tag = f"benefit_{nhom_id}" if nhom_id else "benefit"
+            
+            self.result_text.insert(tk.END, f"  + {ten_ql}: ", benefit_tag)
             self.result_text.insert(tk.END, f"{han_muc} ", "db_bold")
             self.result_text.insert(tk.END, f"{mo_ta}\n", "db_value")
 
@@ -255,7 +294,19 @@ class CheckContractPanel(ttk.Frame):
             )
             return # Dừng lại, không hiển thị popup
 
-        # 2. Nếu chưa, hiển thị popup như bình thường
+        # 2. Kiểm tra xem người tạo hợp đồng có phải là người đang đăng nhập không
+        created_by = details.get('created_by')
+        current_user_id = self.controller.current_user.get('id')
+        
+        if created_by == current_user_id:
+            Messagebox.show_error(
+                title="Không được phép",
+                message="Bạn không thể xác thực hợp đồng do chính bạn tạo.",
+                parent=self
+            )
+            return
+
+        # 3. Nếu chưa, hiển thị popup như bình thường
         company_name = details.get('tenCongTy', 'N/A')
         contract_number = details.get('soHopDong', 'N/A')
 

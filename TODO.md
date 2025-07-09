@@ -27,3 +27,7 @@ Sử dụng checkbox `[ ]` / `[x]` để đánh dấu tình trạng hoàn thành
  version 0.2.2rc1
 - [x] Fix lỗi tìm kiếm trong chỉnh sửa hợp đồng (4) và thêm quyền lợi (3) at 2025-07-09 10:40:00
 
+ version 0.2.2rc2
+- [x] Fix lỗi tìm kiếm theo từng tiêu chí quyền lợi ở panel (1) at 2025-07-09 10:50:00
+- [x] chặn xác thực hợp đồng được chính mình tạo
+- [x] fix lỗi luôn active hợp đồng khi thêm mới

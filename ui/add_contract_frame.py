@@ -169,6 +169,7 @@ class AddContractFrame(ttk.Frame):
             Messagebox.show_error("Không xác định được người dùng. Vui lòng đăng nhập lại.", "Lỗi")
             return
         contract_data['created_by'] = self.controller.current_user['id']
+        contract_data['isActive'] = 1  # Mặc định hợp đồng mới là active
 
         # --- Thu thập dữ liệu thời gian chờ từ panel phải ---
         waiting_times = []
