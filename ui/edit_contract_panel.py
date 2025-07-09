@@ -187,15 +187,23 @@ class EditContractPanel(ttk.Frame):
             selected_status_display = self.search_status_var.get()
             status_value = status_map.get(selected_status_display, 'active')
 
-            results = db.search_contracts(
-                company_name=search_term,
-                contract_number=search_term,
-                status=status_value
-            )
-
+            # Clear previous results
             for item in self.tree.get_children():
                 self.tree.delete(item)
             self.contracts_data.clear()
+
+            # Tìm kiếm dựa trên số hợp đồng
+            results = db.search_contracts(
+                contract_number=search_term,
+                status=status_value
+            )
+            
+            # Nếu không tìm thấy, thử tìm kiếm dựa trên tên công ty
+            if not results:
+                results = db.search_contracts(
+                    company_name=search_term,
+                    status=status_value
+                )
 
             if not results:
                 Messagebox.show_info("Không tìm thấy hợp đồng phù hợp.", "Thông báo")

@@ -18,9 +18,12 @@ Sử dụng checkbox `[ ]` / `[x]` để đánh dấu tình trạng hoàn thành
 - [x] UPDATE DATABASE LOG TABLE - Đã sửa trong `database.py` (08/07/2025)
 - [x] Refresh data thời gian chờ sau khi thêm mới - Đã sửa trong `add_contract_frame.py` (08/07/2025)
 
-## version 0.2.2
+## version 0.2.2 
 - [x] Bảng view thêm tính năng xác thực
 - [x] Chỉnh sửa ngày giờ thành GMT +7
 - [x] Add trigger log
 - [ ] Update trigger database: Khi có thay đổi hợp đồng sẽ bỏ verify_by
+
+ version 0.2.2rc1
+- [x] Fix lỗi tìm kiếm trong chỉnh sửa hợp đồng (4) và thêm quyền lợi (3) at 2025-07-09 10:40:00
 
