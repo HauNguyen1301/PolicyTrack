@@ -161,7 +161,7 @@ class AddContractFrame(ttk.Frame):
             mr_app_status = "Có"
             mr_app_details = self.mr_app_details.get().strip()
             # Nếu bật mà không nhập chi tiết, vẫn lưu là "Có"
-            contract_data['mr_app'] = f"{mr_app_status} - {mr_app_details}" if mr_app_details else mr_app_status
+            contract_data['mr_app'] = f"{mr_app_status} {mr_app_details}" if mr_app_details else mr_app_status
         else:
             contract_data['mr_app'] = "Không"
 

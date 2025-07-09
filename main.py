@@ -128,7 +128,7 @@ class App(ttk.Window):
     def __init__(self):
         super().__init__(themename="superhero")
         self.title(f"PolicyTrack {__version__}")
-        self.geometry("1000x800")
+        self.geometry("960x498")
 
         # Xử lý sự kiện đóng cửa sổ để thoát ứng dụng một cách an toàn
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
@@ -188,6 +188,14 @@ class App(ttk.Window):
     def login_success(self, user):
         """Xử lý sau khi đăng nhập thành công."""
         self.current_user = user
+        
+        # Phóng to cửa sổ và căn giữa
+        self.geometry("1000x800")
+        self.update_idletasks()
+        x = (self.winfo_screenwidth() // 2) - (self.winfo_width() // 2)
+        y = (self.winfo_screenheight() // 2) - (self.winfo_height() // 2)
+        self.geometry(f"+{x}+{y}")
+
         main_frame = self.frames["MainApplicationFrame"]
         
         # Cập nhật lời chào và trạng thái các nút dựa trên vai trò
@@ -211,6 +219,13 @@ class App(ttk.Window):
 
             # Xóa thông tin người dùng hiện tại
             self.current_user = None
+            
+            # Thu nhỏ cửa sổ về kích thước login và căn giữa
+            self.geometry("960x498")
+            self.update_idletasks()
+            x = (self.winfo_screenwidth() // 2) - (self.winfo_width() // 2)
+            y = (self.winfo_screenheight() // 2) - (self.winfo_height() // 2)
+            self.geometry(f"+{x}+{y}")
 
             # Hiển thị lại màn hình đăng nhập và xóa các ô nhập liệu
             login_frame = self.frames["LoginFrame"]

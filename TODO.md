@@ -31,3 +31,9 @@ Sử dụng checkbox `[ ]` / `[x]` để đánh dấu tình trạng hoàn thành
 - [x] Fix lỗi tìm kiếm theo từng tiêu chí quyền lợi ở panel (1) at 2025-07-09 10:50:00
 - [x] chặn xác thực hợp đồng được chính mình tạo
 - [x] fix lỗi luôn active hợp đồng khi thêm mới
+
+ version 0.2.2rc3
+- [x] Fix lỗi MR APP hiển thị rõ ràng
+- [x] Thêm tooltip frame4
+- [x] Add background
+- [x] show nút đổi trạng thái

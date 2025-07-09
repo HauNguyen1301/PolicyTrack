@@ -20,6 +20,10 @@ class EditContractPanel(ttk.Frame):
         # Biến cho combobox trạng thái tìm kiếm
         self.search_status_var = tk.StringVar(value="Hoạt động")
 
+        # Tooltip attributes
+        self._tooltip_window = None
+        self._current_hover_row = None
+
         self._fetch_data()
         
         style = ttk.Style()
@@ -111,6 +115,8 @@ class EditContractPanel(ttk.Frame):
         
         self.tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         self.tree.bind("<Double-1>", self.on_contract_select)
+        self.tree.bind("<Motion>", self._on_tree_motion)
+        self.tree.bind("<Leave>", lambda e: self._hide_tooltip())
 
     def _create_info_panel(self):
         self.contract_info_frame = ttk.LabelFrame(self.main_container, text="Thông tin hợp đồng", padding=10, bootstyle="info")
@@ -271,9 +277,9 @@ class EditContractPanel(ttk.Frame):
             text="Đổi trạng thái", 
             command=self._save_active_status,
             bootstyle="success-outline",
-            width=5
+            width=13
         )
-        save_status_button.grid(row=status_row, column=2, sticky="e", padx=5, pady=5)
+        save_status_button.grid(row=status_row+1, column=1, sticky="e", padx=5, pady=5)
 
     def _save_active_status(self):
         if not self.current_contract:
@@ -688,3 +694,41 @@ class EditContractPanel(ttk.Frame):
                 self.current_contract = updated_contract
         except Exception as e:
             print(f"Error refreshing contract data: {e}")
+
+    # ---------------- Tooltip helpers -----------------
+    def _on_tree_motion(self, event):
+        """Show/update tooltip when hovering over a Treeview row."""
+        row_id = self.tree.identify_row(event.y)
+        if row_id != self._current_hover_row:
+            self._current_hover_row = row_id
+            if not row_id:
+                self._hide_tooltip()
+                return
+            # Get data for tooltip
+            values = self.tree.item(row_id, "values")
+            if not values:
+                self._hide_tooltip()
+                return
+            card_no = values[0]  # "Số HĐ" column value
+            company = values[1]  # "Công ty" column value
+            text = f"Số thẻ: {card_no}\nCông ty: {company}"
+            self._show_tooltip(event.x_root + 20, event.y_root + 10, text)
+        else:
+            # Reposition existing tooltip
+            if self._tooltip_window and self._tooltip_window.winfo_exists():
+                self._tooltip_window.geometry(f"+{event.x_root + 20}+{event.y_root + 10}")
+
+    def _show_tooltip(self, x, y, text):
+        self._hide_tooltip()
+        self._tooltip_window = tw = tk.Toplevel(self.tree)
+        tw.wm_overrideredirect(True)
+        tw.attributes("-topmost", True)
+        label = ttk.Label(tw, text=text, padding=5, bootstyle="light")
+        label.pack()
+        tw.geometry(f"+{x}+{y}")
+
+    def _hide_tooltip(self):
+        if self._tooltip_window and self._tooltip_window.winfo_exists():
+            self._tooltip_window.destroy()
+        self._tooltip_window = None
+        self._current_hover_row = None
