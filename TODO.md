@@ -37,3 +37,6 @@ Sử dụng checkbox `[ ]` / `[x]` để đánh dấu tình trạng hoàn thành
 - [x] Thêm tooltip frame4
 - [x] Add background
 - [x] show nút đổi trạng thái
+
+ version 0.2.2rc4 at 2025-07-10 10:30:00
+- [ ] fix lỗi image khi build exe

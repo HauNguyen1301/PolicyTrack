@@ -2,12 +2,14 @@ import ttkbootstrap as ttk
 from ttkbootstrap.dialogs import Messagebox
 import database
 from PIL import Image, ImageTk
+import base64
+import io
+from image.background_image import image_data_base64
 
 class LoginFrame(ttk.Frame):
     def __init__(self, parent, controller):
         super().__init__(parent)
         self.controller = controller
-        self.image_path = "image/backgroud.jpeg"
         self.bg_image = None
 
         # Cấu hình grid của LoginFrame để đẩy canvas ra giữa
@@ -26,21 +28,24 @@ class LoginFrame(ttk.Frame):
 
     def load_and_display_background(self):
         try:
-            # Mở ảnh gốc và resize
-            self.original_image = Image.open(self.image_path)
+            # Giải mã dữ liệu Base64
+            image_data = base64.b64decode(image_data_base64)
+            image_stream = io.BytesIO(image_data)
+            
+            # Mở ảnh từ stream và resize
+            self.original_image = Image.open(image_stream)
             resized_image = self.original_image.resize((960, 498), Image.LANCZOS)
             self.bg_image = ImageTk.PhotoImage(resized_image)
 
             # Vẽ hình mới
             self.canvas.create_image(0, 0, image=self.bg_image, anchor="nw")
 
-        except FileNotFoundError:
+        except Exception as e:
+            print(f"Lỗi khi tải ảnh từ dữ liệu Base64: {e}")
             self.canvas.create_text(
                 480, 249, # Giữa canvas 960x498
-                text="Không tìm thấy ảnh nền", font=("Arial", 16), fill="red"
+                text="Lỗi tải ảnh nền", font=("Arial", 16), fill="red"
             )
-        except Exception as e:
-            print(f"Lỗi khi tải ảnh: {e}")
 
     def create_login_widgets(self):
         # Frame chứa các widget đăng nhập, đặt trên canvas
