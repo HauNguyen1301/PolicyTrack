@@ -387,11 +387,11 @@ class AddContractFrame(ttk.Frame):
         frame.pack(expand=True, fill="both")
         frame.columnconfigure(1, weight=1)
 
-        ttk.Label(frame, text="Loại chờ:").grid(row=0, column=0, sticky="w", pady=5)
+        ttk.Label(frame, text="Đối tượng:").grid(row=0, column=0, sticky="w", pady=5)
         loai_cho_entry = ttk.Entry(frame)
         loai_cho_entry.grid(row=0, column=1, sticky="ew")
 
-        ttk.Label(frame, text="Mô tả:").grid(row=1, column=0, sticky="w", pady=5)
+        ttk.Label(frame, text="Phân loại:").grid(row=1, column=0, sticky="w", pady=5)
         mo_ta_entry = ttk.Entry(frame)
         mo_ta_entry.grid(row=1, column=1, sticky="ew")
 

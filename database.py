@@ -536,7 +536,7 @@ def search_contracts(company_name: str = '', contract_number: str = '', benefit_
 def get_waiting_periods_for_contract(conn: libsql_client.Client, contract_id: int) -> List[Dict[str, Any]]:
     """Lấy danh sách thời gian chờ cho một hợp đồng cụ thể."""
     query = """
-        SELECT tgc.loai_cho, hqc.gia_tri
+        SELECT tgc.loai_cho, hqc.gia_tri, tgc.mo_ta
         FROM hopdong_quydinh_cho hqc
         JOIN thoi_gian_cho tgc ON hqc.cho_id = tgc.id
         WHERE hqc.hopdong_id = ?
@@ -954,10 +954,6 @@ def add_waiting_time(loai_cho: str, mo_ta: str) -> Tuple[bool, str]:
     """
     client = get_db_connection()
     try:
-        rs = client.execute("SELECT 1 FROM thoi_gian_cho WHERE loai_cho = ?", [loai_cho])
-        if len(rs.rows) > 0:
-            return False, f"Lỗi: Loại thời gian chờ '{loai_cho}' đã tồn tại."
-
         client.execute(
             "INSERT INTO thoi_gian_cho (loai_cho, mo_ta) VALUES (?, ?)",
             [loai_cho, mo_ta]

@@ -220,7 +220,8 @@ class CheckContractPanel(ttk.Frame):
             return
         self.result_text.insert(tk.END, "- Thời gian chờ:\n", "subheader")
         for period in waiting_periods:
-            line = f"  + {period.get('loai_cho', 'N/A')}: {period.get('gia_tri', 'N/A')}\n"
+            mo_ta_display = f"- {period.get('mo_ta', '')}" if period.get('mo_ta') else ""
+            line = f"  + {period.get('loai_cho', 'N/A')} {mo_ta_display}: {period.get('gia_tri', 'N/A')}\n"
             self.result_text.insert(tk.END, line, "benefit")
 
     def _display_mr_app(self, details):

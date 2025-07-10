@@ -39,4 +39,8 @@ Sử dụng checkbox `[ ]` / `[x]` để đánh dấu tình trạng hoàn thành
 - [x] show nút đổi trạng thái
 
  version 0.2.2rc4 at 2025-07-10 10:30:00
-- [ ] fix lỗi image khi build exe
+- [x] fix lỗi image khi build exe
+
+ version 0.2.2rc5 at 2025-07-10 16:30:00
+- [x] Edit design for database -> thoi_gian_cho
+- [x] Change rule check trùng loai_cho
