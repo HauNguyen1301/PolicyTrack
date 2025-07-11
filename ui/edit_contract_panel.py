@@ -1,8 +1,10 @@
 import tkinter as tk
 import ttkbootstrap as ttk
+from ttkbootstrap.widgets import DateEntry
 from ttkbootstrap.dialogs import Messagebox
 import database as db
 from utils.date_utils import format_date, format_date_range, _to_date
+from utils.text_utils import remove_accents_and_lowercase
 
 class EditContractPanel(ttk.Frame):
     def __init__(self, parent, controller):
@@ -198,18 +200,17 @@ class EditContractPanel(ttk.Frame):
                 self.tree.delete(item)
             self.contracts_data.clear()
 
-            # Tìm kiếm dựa trên số hợp đồng
+            # Xử lý chuỗi tìm kiếm để tìm không dấu
+            search_term_no_accent = remove_accents_and_lowercase(search_term)
+
+            # Tìm kiếm dựa trên cả tên công ty (có dấu và không dấu) và số hợp đồng
+            # Giả định người dùng có thể nhập tên công ty hoặc số HĐ vào cùng một ô
             results = db.search_contracts(
+                company_name=search_term,
                 contract_number=search_term,
-                status=status_value
+                status=status_value,
+                company_name_no_accent=search_term_no_accent
             )
-            
-            # Nếu không tìm thấy, thử tìm kiếm dựa trên tên công ty
-            if not results:
-                results = db.search_contracts(
-                    company_name=search_term,
-                    status=status_value
-                )
 
             if not results:
                 Messagebox.show_info("Không tìm thấy hợp đồng phù hợp.", "Thông báo")
@@ -303,14 +304,20 @@ class EditContractPanel(ttk.Frame):
     def _create_general_info_tab(self):
         frame = self.tab_general
         frame.columnconfigure(1, weight=1)
-        self.edit_fields = {
-            "Số hợp đồng:": tk.StringVar(), "Tên công ty:": tk.StringVar(),
-            "Hiệu lực từ:": tk.StringVar(), "Hiệu lực đến:": tk.StringVar(),
-            "Co-pay:": tk.StringVar()
-        }
-        for i, (label, var) in enumerate(self.edit_fields.items()):
-            ttk.Label(frame, text=label).grid(row=i, column=0, sticky="w", padx=5, pady=5)
-            ttk.Entry(frame, textvariable=var).grid(row=i, column=1, sticky="ew", padx=5, pady=5)
+        
+        self.edit_fields = {}
+        labels = ["Số hợp đồng:", "Tên công ty:", "Hiệu lực từ:", "Hiệu lực đến:", "Co-pay:"]
+        db_keys = ["soHopDong", "tenCongTy", "HLBH_tu", "HLBH_den", "coPay"]
+
+        for i, (label_text, db_key) in enumerate(zip(labels, db_keys)):
+            ttk.Label(frame, text=label_text).grid(row=i, column=0, sticky="w", padx=5, pady=5)
+            if "Hiệu lực" in label_text:
+                widget = DateEntry(frame, bootstyle="info", dateformat="%d/%m/%Y")
+            else:
+                widget = ttk.Entry(frame)
+            widget.grid(row=i, column=1, sticky="ew", padx=5, pady=5)
+            self.edit_fields[db_key] = widget
+
         self.save_general_info_button = ttk.Button(frame, text="Lưu thay đổi chung", command=self._save_general_info_changes)
         self.save_general_info_button.grid(row=len(self.edit_fields), column=0, columnspan=2, pady=10)
 
@@ -336,12 +343,23 @@ class EditContractPanel(ttk.Frame):
     def _fetch_data(self):
         try:
             waiting_times_data = db.get_all_waiting_times()
-            self.waiting_time_id_to_text_map = {item['id']: item['loai_cho'] for item in waiting_times_data}
+            # Tạo văn bản hiển thị kết hợp loai_cho và mo_ta, và các map cần thiết
+            self.waiting_time_id_to_text_map = {
+                item['id']: f"{item['loai_cho']} - {item.get('mo_ta', '')}".strip()
+                for item in waiting_times_data
+            }
             self.waiting_time_text_to_id_map = {v: k for k, v in self.waiting_time_id_to_text_map.items()}
             self.waiting_time_options = sorted(list(self.waiting_time_text_to_id_map.keys()))
+            
+            # Tạo một map từ (loai_cho, mo_ta) -> id để tra cứu khi populate form
+            self.waiting_time_lookup_map = {
+                (item['loai_cho'], item.get('mo_ta', '')): item['id']
+                for item in waiting_times_data
+            }
+
         except Exception as e:
             Messagebox.show_error(f"Không thể tải dữ liệu: {e}", "Lỗi Database")
-            self.waiting_time_id_to_text_map, self.waiting_time_text_to_id_map, self.waiting_time_options = {}, {}, []
+            self.waiting_time_id_to_text_map, self.waiting_time_text_to_id_map, self.waiting_time_options, self.waiting_time_lookup_map = {}, {}, [], {}
 
     def _populate_special_cards_tab(self):
         # Ensure the scrollable frame is present; if not, create tab UI.
@@ -494,13 +512,15 @@ class EditContractPanel(ttk.Frame):
 
     def _populate_general_info_tab(self):
         details = self.current_contract['details']
-        for key, var in self.edit_fields.items():
-            db_key = {"Số hợp đồng:": "soHopDong", "Tên công ty:": "tenCongTy", "Hiệu lực từ:": "HLBH_tu", "Hiệu lực đến:": "HLBH_den", "Co-pay:": "coPay"}[key]
+        for db_key, widget in self.edit_fields.items():
             value = details.get(db_key, '')
-            if "Hiệu lực" in key:
-                var.set(format_date(value))
-            else:
-                var.set(value)
+            if isinstance(widget, DateEntry):
+                formatted_val = format_date(value)
+                widget.entry.delete(0, tk.END)
+                widget.entry.insert(0, formatted_val)
+            else:  # ttk.Entry
+                widget.delete(0, tk.END)
+                widget.insert(0, str(value) if value is not None else "")
 
     def _populate_waiting_periods_tab(self):
         for widget in self.waiting_time_rows:
@@ -511,7 +531,9 @@ class EditContractPanel(ttk.Frame):
             self._add_waiting_time_row()
         else:
             for period in waiting_periods:
-                cho_id = self.waiting_time_text_to_id_map.get(period.get('loai_cho'))
+                # Sử dụng map mới để tìm cho_id từ cả loai_cho và mo_ta
+                lookup_key = (period.get('loai_cho'), period.get('mo_ta', ''))
+                cho_id = self.waiting_time_lookup_map.get(lookup_key)
                 if cho_id is not None:
                     self._add_waiting_time_row(cho_id=cho_id, value=period.get('gia_tri'))
         self._update_plus_minus_buttons()
@@ -569,48 +591,41 @@ class EditContractPanel(ttk.Frame):
 
         try:
             data_to_update = {}
-            raw_data = {label: var.get() for label, var in self.edit_fields.items()}
+            
+            # --- Lấy dữ liệu và VALIDATION ---
+            for db_key, widget in self.edit_fields.items():
+                if isinstance(widget, DateEntry):
+                    try:
+                        date_obj = widget.get() # This returns a datetime.date object
+                        data_to_update[db_key] = date_obj.strftime('%Y-%m-%d')
+                    except (ValueError, AttributeError):
+                        label_map = {"HLBH_tu": "Hiệu lực từ", "HLBH_den": "Hiệu lực đến"}
+                        Messagebox.show_warning(f"Ngày '{label_map.get(db_key)}' không hợp lệ.", "Lỗi định dạng")
+                        return
+                else: # ttk.Entry
+                    value = widget.get().strip()
+                    if db_key in ["soHopDong", "tenCongTy"] and not value:
+                        label_map = {"soHopDong": "Số hợp đồng", "tenCongTy": "Tên công ty"}
+                        Messagebox.show_warning(f"'{label_map.get(db_key)}' không được để trống.", "Thiếu thông tin")
+                        return
+                    data_to_update[db_key] = value
 
-            # --- VALIDATION --- #
-            # 1. Kiểm tra các trường bắt buộc
-            if not raw_data.get("Số hợp đồng:") or not raw_data.get("Tên công ty:"):
-                Messagebox.show_warning("Số hợp đồng và Tên công ty không được để trống.", "Thiếu thông tin")
-                return
-
-            # 2. Kiểm tra và xử lý ngày tháng
-            date_from_str = raw_data.get("Hiệu lực từ:")
-            date_to_str = raw_data.get("Hiệu lực đến:")
-
-            date_from_obj = _to_date(date_from_str)
-            date_to_obj = _to_date(date_to_str)
-
-            if not date_from_obj or not date_to_obj:
-                Messagebox.show_warning(f"Định dạng ngày không hợp lệ. Vui lòng sử dụng định dạng DD/MM/YYYY.", "Lỗi định dạng")
-                return
-
+            # Kiểm tra logic ngày
+            date_from_obj = _to_date(data_to_update['HLBH_tu'])
+            date_to_obj = _to_date(data_to_update['HLBH_den'])
             if date_to_obj < date_from_obj:
                 Messagebox.show_warning("Ngày 'Hiệu lực đến' phải sau hoặc bằng ngày 'Hiệu lực từ'.", "Lỗi logic ngày")
                 return
 
-            # --- CHUẨN BỊ DỮ LIỆU ĐỂ LƯU ---
-            data_to_update = {
-                'soHopDong': raw_data.get("Số hợp đồng:"),
-                'tenCongTy': raw_data.get("Tên công ty:"),
-                'coPay': raw_data.get("Co-pay:"),
-                'HLBH_tu': date_from_obj.strftime('%Y-%m-%d'),
-                'HLBH_den': date_to_obj.strftime('%Y-%m-%d')
-            }
-
-            # Gọi hàm cập nhật từ database
+            # --- GỌI DATABASE ---
             hopdong_id = self.current_contract['details']['id']
             success, message = db.update_contract_general_info(hopdong_id, data_to_update)
 
             if success:
                 Messagebox.show_info(message, "Thành công")
-                # Làm mới dữ liệu sau khi cập nhật
                 self.refresh_current_contract_data()
-                self.update_contract_info() # Cập nhật lại panel thông tin
-                self._populate_general_info_tab() # Cập nhật lại tab thông tin chung
+                self.update_contract_info()
+                self._populate_general_info_tab()
             else:
                 Messagebox.show_error(message, "Lỗi")
 

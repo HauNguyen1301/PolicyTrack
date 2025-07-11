@@ -4,6 +4,7 @@ from ttkbootstrap.dialogs import Messagebox
 import database as db
 import datetime  # TODO: Remove if no longer used elsewhere
 from utils.date_utils import format_date, format_date_range
+from utils.text_utils import remove_accents_and_lowercase
 
 
 
@@ -262,12 +263,16 @@ class AddBenefitFrame(ttk.Frame):
                 self.tree.delete(item)
             self.contracts_data.clear()
 
-            # Tìm kiếm dựa trên số hợp đồng với status='all'
-            results = db.search_contracts(contract_number=search_term, status='all')
-            
-            # Nếu không tìm thấy, thử tìm kiếm dựa trên tên công ty với status='all'
-            if not results:
-                results = db.search_contracts(company_name=search_term, status='all')
+            # Xử lý chuỗi tìm kiếm để tìm không dấu
+            search_term_no_accent = remove_accents_and_lowercase(search_term)
+
+            # Tìm kiếm dựa trên cả tên công ty (có dấu và không dấu) và số hợp đồng
+            results = db.search_contracts(
+                company_name=search_term,
+                contract_number=search_term,
+                status='all',
+                company_name_no_accent=search_term_no_accent
+            )
                 
             if not results:
                 Messagebox.show_info("Không tìm thấy hợp đồng nào phù hợp", "Thông báo")

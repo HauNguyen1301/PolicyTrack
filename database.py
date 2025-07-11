@@ -354,6 +354,13 @@ def add_contract(contract_data: Dict[str, Any]) -> Tuple[bool, str]:
     """
     client = get_db_connection()
     try:
+        # Step 0: Check for duplicate contract number
+        so_hop_dong_to_check = contract_data.get('soHopDong')
+        if so_hop_dong_to_check:
+            rs_check = client.execute("SELECT id FROM hopdong_baohiem WHERE soHopDong = ?", [so_hop_dong_to_check])
+            if len(rs_check.rows) > 0:
+                return False, f"Lỗi: Số hợp đồng '{so_hop_dong_to_check}' đã tồn tại. Vui lòng kiểm tra lại."
+
         # Step 1: Insert the main contract details
         rs = client.execute(
             """
@@ -434,7 +441,7 @@ def get_all_benefit_groups() -> List[Dict[str, Any]]:
     finally:
         pass  # keep global client open
 
-def search_contracts(company_name: str = '', contract_number: str = '', benefit_group_ids: Optional[List[int]] = None, status: str = 'active') -> List[Dict[str, Any]]:
+def search_contracts(company_name: str = '', contract_number: str = '', benefit_group_ids: Optional[List[int]] = None, status: str = 'active', company_name_no_accent: str = '') -> List[Dict[str, Any]]:
     """Tìm kiếm hợp đồng dựa trên tên công ty, số hợp đồng, và trạng thái.
 
     Args:
@@ -442,6 +449,7 @@ def search_contracts(company_name: str = '', contract_number: str = '', benefit_
         contract_number (str): Số hợp đồng (có thể là một phần).
         benefit_group_ids (Optional[List[int]]): Danh sách ID các nhóm quyền lợi để lọc.
         status (str): Trạng thái hợp đồng để lọc ('active', 'inactive', 'all').
+        company_name_no_accent (str): Tên công ty đã được xử lý (không dấu, chữ thường).
 
     Returns:
         List[Dict[str, Any]]: Danh sách các hợp đồng tìm thấy.
@@ -458,7 +466,7 @@ def search_contracts(company_name: str = '', contract_number: str = '', benefit_
         where_clauses = []
 
         # Kiểm tra xem có bất kỳ tiêu chí tìm kiếm nào được chọn không
-        has_search_criteria = company_name or contract_number or (benefit_group_ids and benefit_group_ids != [])
+        has_search_criteria = company_name or contract_number or (benefit_group_ids and benefit_group_ids != []) or company_name_no_accent
 
         # Nếu không có tiêu chí tìm kiếm nào, hiển thị tất cả hợp đồng
         if not has_search_criteria:
@@ -480,16 +488,27 @@ def search_contracts(company_name: str = '', contract_number: str = '', benefit_
         # Nếu status là 'all', không thêm điều kiện
 
         # Lọc theo từ khóa tìm kiếm (tên công ty hoặc số HĐ)
-        if company_name or contract_number:
+        if company_name or contract_number or company_name_no_accent:
             search_conditions = []
+            # Tìm kiếm linh hoạt: hoặc tên có dấu, hoặc tên không dấu, hoặc số HĐ
+            company_search_parts = []
             if company_name:
-                search_conditions.append("hdb.tenCongTy LIKE ?")
+                company_search_parts.append("hdb.tenCongTy LIKE ?")
                 params.append(f"%{company_name}%")
+            if company_name_no_accent:
+                # Giả sử cột không dấu có tên là tenCongTy_kodau
+                company_search_parts.append("hdb.tenCongTy_kodau LIKE ?")
+                params.append(f"%{company_name_no_accent}%")
+            
+            if company_search_parts:
+                 search_conditions.append(f"({ ' OR '.join(company_search_parts) })")
+
             if contract_number:
                 search_conditions.append("hdb.soHopDong LIKE ?")
                 params.append(f"%{contract_number}%")
         
-            if search_conditions:  # Chỉ thêm điều kiện nếu có search_conditions
+            if search_conditions:
+                # Nếu có cả tiêu chí công ty và số HĐ, chúng phải thỏa mãn đồng thời (AND)
                 where_clauses.append(f"({ ' AND '.join(search_conditions) })")
 
         # Lọc theo nhóm quyền lợi nếu được chọn

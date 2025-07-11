@@ -4,6 +4,7 @@ from ttkbootstrap.dialogs import Messagebox
 from datetime import datetime   
 import database
 from utils.date_utils import format_date
+from utils.text_utils import remove_accents_and_lowercase
 
 
 class CheckContractPanel(ttk.Frame):
@@ -127,8 +128,16 @@ class CheckContractPanel(ttk.Frame):
             return
 
         try:
+            # Xử lý chuỗi tên công ty để tìm kiếm không dấu
+            company_name_no_accent = remove_accents_and_lowercase(company_name)
+
             # Lấy tất cả kết quả không phân biệt nhóm quyền lợi
-            results = database.search_contracts(company_name, contract_number, [])
+            results = database.search_contracts(
+                company_name=company_name,
+                contract_number=contract_number,
+                benefit_group_ids=[],
+                company_name_no_accent=company_name_no_accent
+            )
             
             # Nếu có nhóm quyền lợi được chọn, lọc lại kết quả
             if selected_group_ids:

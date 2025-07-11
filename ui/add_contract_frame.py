@@ -1,5 +1,6 @@
 import tkinter as tk
 import ttkbootstrap as ttk
+from ttkbootstrap.widgets import DateEntry
 from ttkbootstrap.dialogs import Messagebox
 import database
 from utils.date_utils import _to_date
@@ -47,8 +48,8 @@ class AddContractFrame(ttk.Frame):
         self.fields = {
             "soHopDong": ("Số Hợp Đồng:", ttk.Entry(top_left_panel)),
             "tenCongTy": ("Tên Công Ty:", ttk.Entry(top_left_panel)),
-            "HLBH_tu": ("Hiệu lực từ (DD/MM/YYYY):", ttk.Entry(top_left_panel)),
-            "HLBH_den": ("Hiệu lực đến (DD/MM/YYYY):", ttk.Entry(top_left_panel)),
+            "HLBH_tu": ("Hiệu lực từ (DD/MM/YYYY):", DateEntry(top_left_panel, bootstyle="info", dateformat="%d/%m/%Y")),
+            "HLBH_den": ("Hiệu lực đến (DD/MM/YYYY):", DateEntry(top_left_panel, bootstyle="info", dateformat="%d/%m/%Y")),
             "coPay": ("Đồng chi trả (%):", ttk.Entry(top_left_panel)),
             "sign_CF": ("Đóng dấu trên CF:", ttk.Combobox(top_left_panel, state="readonly"))
         }
@@ -137,19 +138,29 @@ class AddContractFrame(ttk.Frame):
         # --- Thu thập dữ liệu từ panel trái ---
         contract_data = {}
         for key, (label_text, widget) in self.fields.items():
+            # Xử lý DateEntry riêng
+            if isinstance(widget, DateEntry):
+                date_str = widget.entry.get()
+                date_obj = _to_date(date_str) # Sử dụng helper function
+                if date_obj is None:
+                    Messagebox.show_error(f"Định dạng ngày '{label_text}' không hợp lệ. Vui lòng sử dụng DD/MM/YYYY.", "Lỗi định dạng ngày")
+                    return
+                contract_data[key] = date_obj.strftime("%Y-%m-%d")
+                continue
+
+            # Xử lý các widget khác
             value = widget.get()
             if not value:
                 Messagebox.show_error(f"Trường '{label_text}' không được để trống.", "Lỗi")
                 return
-            # Chuẩn hóa ngày cho hai trường HLBH_tu, HLBH_den
-            if key in ("HLBH_tu", "HLBH_den"):
-                parsed_date = _to_date(value)
-                if not parsed_date:
-                    Messagebox.show_error(f"{label_text} không đúng định dạng dd/mm/yyyy.", "Lỗi")
-                    return
-                contract_data[key] = parsed_date.strftime("%Y-%m-%d")
-            else:
-                contract_data[key] = value
+            contract_data[key] = value
+
+        # --- Kiểm tra logic ngày ---
+        date_from_obj = _to_date(contract_data['HLBH_tu'])
+        date_to_obj = _to_date(contract_data['HLBH_den'])
+        if date_from_obj and date_to_obj and date_to_obj < date_from_obj:
+            Messagebox.show_warning("Ngày 'Hiệu lực đến' phải sau hoặc bằng ngày 'Hiệu lực từ'.", "Lỗi logic ngày")
+            return
 
         contract_data['coPay'] = contract_data['coPay'].strip()
 
