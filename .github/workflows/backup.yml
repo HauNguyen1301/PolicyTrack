@@ -12,30 +12,16 @@ jobs:
   backup:
     runs-on: ubuntu-latest
     steps:
-      # Bước 1: Cài đặt Turso CLI (Dùng URL cố định đã được xác thực)
-      - name: Install Turso CLI (Stable Method)
-        run: |
-          # URL ĐÃ SỬA LẠI CHO ĐÚNG
-          DOWNLOAD_URL="https://github.com/tursodatabase/turso-cli/releases/download/v0.90.1/turso-v0.90.1-linux-x86_64.tar.gz"
-          
-          echo "Downloading from verified URL: $DOWNLOAD_URL"
-          curl -L -o turso.tar.gz "$DOWNLOAD_URL"
-          
-          # Kiểm tra file tải về
-          echo "Downloaded file info:"
-          ls -l turso.tar.gz
-          
-          tar -xzf turso.tar.gz
-          sudo mv ./turso /usr/local/bin/
-          
-          echo "Turso CLI installed successfully:"
-          turso --version
+      # Bước 1 (THAY ĐỔI HOÀN TOÀN): Dùng action chính thức của Turso để cài đặt
+      - name: Install Turso CLI
+        uses: tursodatabase/setup-turso@v1
+        with:
+          version: 'latest' # Luôn cài đặt phiên bản mới nhất
 
       # Bước 2: Backup CSDL và nén lại
       - name: Backup Database
         id: create_backup_file
         run: |
-          export PATH="/usr/local/bin:${HOME}/.turso/bin:${PATH}"
           TIMESTAMP=$(date +"%Y-%m-%d_%H-%M")
           FILENAME="backup-${TIMESTAMP}.sql.gz"
           
@@ -47,13 +33,7 @@ jobs:
         env:
           TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
 
-      # Bước 3: Cài đặt AWS CLI
-      - name: Install AWS CLI
-        run: |
-          sudo apt-get -y update
-          sudo apt-get -y install awscli
-
-      # Bước 4: Cấu hình thông tin truy cập Cloudflare R2
+      # Bước 3: Cấu hình thông tin truy cập Cloudflare R2
       - name: Configure AWS Credentials for R2
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -61,7 +41,7 @@ jobs:
           aws-secret-access-key: ${{ secrets.R2_SECRET_ACCESS_KEY }}
           aws-region: 'auto'
 
-      # Bước 5: Tải file backup lên R2 bằng AWS CLI
+      # Bước 4: Tải file backup lên R2 bằng AWS CLI
       - name: Upload backup to R2
         run: |
           aws s3 cp ${{ steps.create_backup_file.outputs.filename }} s3://${{ secrets.R2_BUCKET_NAME }}/ --endpoint-url ${{ secrets.R2_ENDPOINT_URL }}
