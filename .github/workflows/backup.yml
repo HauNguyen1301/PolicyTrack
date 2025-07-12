@@ -2,67 +2,39 @@ name: Backup Turso Database
 
 on:
   schedule:
-    # Lên lịch chạy tự động vào 2:00 sáng (UTC) mỗi ngày
     - cron: '0 2 * * *'
   
-  # Cho phép chạy thủ công từ tab Actions trên GitHub
   workflow_dispatch:
 
 jobs:
   backup:
     runs-on: ubuntu-latest
     steps:
-      # Bước 1: Cài đặt Turso CLI (đã sửa lỗi tên file)
-      - name: Install Turso CLI
+      # Bước 1: Cài đặt Turso CLI (với tính năng gỡ lỗi)
+      - name: Install Turso CLI (with Debugging)
         run: |
-          # Sửa lại từ "amd64" thành "x86_64" để khớp với tên file trên GitHub
-          LATEST_URL=$(curl -s "https://api.github.com/repos/tursodatabase/turso-cli/releases/latest" | jq -r '.assets[] | select(.name | endswith("linux_x86_64.tar.gz")) | .browser_download_url')
+          # In ra toàn bộ phản hồi từ API để gỡ lỗi
+          echo "--- Fetching latest release info from GitHub API ---"
+          API_RESPONSE=$(curl -s "https://api.github.com/repos/tursodatabase/turso-cli/releases/latest")
+          echo "$API_RESPONSE"
+          echo "----------------------------------------------------"
+
+          # Vẫn thử tìm URL, nhưng chúng ta biết bước này có thể thất bại
+          LATEST_URL=$(echo "$API_RESPONSE" | jq -r '.assets[] | select(.name | endswith("linux_x86_64.tar.gz")) | .browser_download_url')
 
           if [ -z "$LATEST_URL" ]; then
-            echo "Error: Could not find a download URL for the latest Turso CLI release."
+            echo "Error: Could not find a download URL. Please check the JSON output above to see the correct asset filenames."
             exit 1
           fi
-
+          
+          # Các lệnh dưới đây sẽ không chạy nếu lỗi xảy ra, đó là điều mong muốn
           echo "Downloading from: $LATEST_URL"
           curl -L -o turso.tar.gz "$LATEST_URL"
-          
           tar -xzf turso.tar.gz
           sudo mv ./turso /usr/local/bin/
-          
           echo "Turso CLI installed successfully:"
           turso --version
 
-      # Bước 2: Backup CSDL và nén lại
+      # Các bước sau sẽ không chạy vì bước 1 bị lỗi
       - name: Backup Database
-        id: create_backup_file
-        run: |
-          export PATH="/usr/local/bin:${HOME}/.turso/bin:${PATH}"
-          TIMESTAMP=$(date +"%Y-%m-%d_%H-%M")
-          FILENAME="backup-${TIMESTAMP}.sql.gz"
-          
-          echo "Starting backup for policytrack..."
-          turso db shell policytrack .dump | gzip > ${FILENAME}
-          
-          echo "Backup file created: ${FILENAME}"
-          echo "filename=${FILENAME}" >> $GITHUB_OUTPUT
-        env:
-          TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
-
-      # Bước 3: Cài đặt AWS CLI
-      - name: Install AWS CLI
-        run: |
-          sudo apt-get -y update
-          sudo apt-get -y install awscli
-
-      # Bước 4: Cấu hình thông tin truy cập Cloudflare R2
-      - name: Configure AWS Credentials for R2
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.R2_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.R2_SECRET_ACCESS_KEY }}
-          aws-region: 'auto'
-
-      # Bước 5: Tải file backup lên R2 bằng AWS CLI
-      - name: Upload backup to R2
-        run: |
-          aws s3 cp ${{ steps.create_backup_file.outputs.filename }} s3://${{ secrets.R2_BUCKET_NAME }}/ --endpoint-url ${{ secrets.R2_ENDPOINT_URL }}
+      # ...
