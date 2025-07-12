@@ -4,7 +4,6 @@ Sử dụng checkbox `[ ]` / `[x]` để đánh dấu tình trạng hoàn thành
 
 ## Công việc đang thực hiện
 - [x] Tạm khóa add_benefit_frame.py - Đã vô hiệu hóa nút "Thêm Quyền Lợi" (08/07/2025)
-- [ ] 
 
 ## Công việc đã hoàn thành
 - [x] Ví dụ: Đã tạo file TODO.md
@@ -37,3 +36,14 @@ Sử dụng checkbox `[ ]` / `[x]` để đánh dấu tình trạng hoàn thành
 - [x] Thêm tooltip frame4
 - [x] Add background
 - [x] show nút đổi trạng thái
+
+ version 0.2.2rc4 at 2025-07-10 10:30:00
+- [x] fix lỗi image khi build exe
+
+ version 0.2.2rc5 at 2025-07-10 16:30:00
+- [x] Edit design for database -> thoi_gian_cho
+- [x] Change rule check trùng loai_cho
+
+ version 0.2.2rc6 at 2025-07-11 11:45:00
+- [x] Improve search functions
+- [x] Check trùng HD khi thêm mới

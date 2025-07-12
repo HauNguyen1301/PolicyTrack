@@ -11,3 +11,10 @@ class EditBenefitPanel(Frame):
             font=("Arial", 14, "bold")
         )
         label.pack(padx=10, pady=40, anchor="center")
+
+        subtitle_label = ttk.Label(
+            self,
+            text="Vui lòng liên hệ tác giả trong trường hợp cần xóa thông tin",
+            font=("Arial", 10)
+        )
+        subtitle_label.pack(pady=5, anchor="center")
