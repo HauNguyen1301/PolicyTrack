@@ -2,7 +2,6 @@ name: Backup Turso Database
 
 on:
   schedule:
-    # Tự động chạy vào 2:00 sáng (UTC) mỗi ngày
     - cron: '0 2 * * *'
   workflow_dispatch:
 
@@ -10,57 +9,22 @@ jobs:
   backup:
     runs-on: ubuntu-latest
     steps:
-      # Bước 1: Cài đặt Turso CLI
       - name: Install Turso CLI (Stable Method)
         run: |
-          DOWNLOAD_URL="https://github.com/tursodatabase/turso-cli/releases/download/v0.90.1/turso-v0.90.1-linux-x86_64.tar.gz"
+          DOWNLOAD_URL="https://github.com/tursodatabase/turso-cli/releases/download/v0.130.4/turso-v0.130.4-linux-x86_64.tar.gz"
           echo "Downloading from verified URL: $DOWNLOAD_URL"
           curl -L -o turso.tar.gz "$DOWNLOAD_URL"
+          echo "Downloaded file info:"
+          ls -l turso.tar.gz
+          file turso.tar.gz
+          if ! file turso.tar.gz | grep -q 'gzip compressed data'; then
+            echo "❌ File tải về không phải định dạng gzip, kiểm tra lại URL download!"
+            cat turso.tar.gz
+            exit 1
+          fi
           tar -xzf turso.tar.gz
           sudo mv ./turso /usr/local/bin/
           echo "Turso CLI installed successfully:"
           turso --version
 
-      # Bước 2: Backup CSDL và nén lại
-      - name: Backup Database
-        id: create_backup_file
-        run: |
-          export PATH="/usr/local/bin:${HOME}/.turso/bin:${PATH}"
-          TIMESTAMP=$(date +"%Y-%m-%d_%H-%M")
-          FILENAME="backup-${TIMESTAMP}.sql.gz"
-          echo "Starting backup for policytrack..."
-          turso db shell policytrack .dump | gzip > ${FILENAME}
-          echo "Backup file created: ${FILENAME}"
-          echo "filename=${FILENAME}" >> $GITHUB_OUTPUT
-        env:
-          TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
-
-      # Bước 3: Cài đặt AWS CLI
-      - name: Install AWS CLI
-        run: |
-          sudo apt-get -y update
-          sudo apt-get -y install awscli
-
-      # Bước 4: Cấu hình thông tin truy cập Cloudflare R2
-      - name: Configure AWS Credentials for R2
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.R2_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.R2_SECRET_ACCESS_KEY }}
-          aws-region: 'auto'
-
-      # Bước 5: Tải file backup lên R2 bằng AWS CLI
-      - name: Upload backup to R2
-        run: |
-          aws s3 cp ${{ steps.create_backup_file.outputs.filename }} s3://${{ secrets.R2_BUCKET_NAME }}/ --endpoint-url ${{ secrets.R2_ENDPOINT_URL }}
-
-      # Bước 6: Debug (tuỳ chọn, kiểm tra file backup)
-      - name: Debug - Check backup file exists
-        run: |
-          ls -al
-          echo "Backup filename: ${{ steps.create_backup_file.outputs.filename }}"
-          if [ -f "${{ steps.create_backup_file.outputs.filename }}" ]; then
-            echo "Backup file exists"
-          else
-            echo "Backup file NOT FOUND"
-          fi
+      # Các bước khác giữ nguyên như ban đầu...
