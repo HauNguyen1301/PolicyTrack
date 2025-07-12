@@ -18,7 +18,7 @@ jobs:
 
       # Bước 2: Backup CSDL và nén lại
       - name: Backup Database
-        id: create_backup_file # Đặt ID cho bước này để lấy tên file ở bước sau
+        id: create_backup_file
         run: |
           export PATH="${HOME}/.turso/bin:${PATH}"
           TIMESTAMP=$(date +"%Y-%m-%d_%H-%M")
@@ -32,17 +32,21 @@ jobs:
         env:
           TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
 
-      # Bước 3 (ĐÃ THAY ĐỔI): Cấu hình thông tin truy cập Cloudflare R2
-      # Sử dụng action chính thức của AWS, an toàn và ổn định hơn
+      # BƯỚC MỚI: Cài đặt AWS CLI để đảm bảo lệnh 'aws s3' hoạt động
+      - name: Install AWS CLI
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y awscli
+
+      # Bước 4: Cấu hình thông tin truy cập Cloudflare R2
       - name: Configure AWS Credentials for R2
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.R2_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.R2_SECRET_ACCESS_KEY }}
-          aws-region: 'auto' # R2 không yêu cầu region cụ thể, 'auto' là phù hợp
+          aws-region: 'auto'
 
-      # Bước 4 (ĐÃ THAY ĐỔI): Tải file backup lên R2 bằng AWS CLI
-      # Sử dụng công cụ dòng lệnh tiêu chuẩn thay vì action của bên thứ ba
+      # Bước 5: Tải file backup lên R2 bằng AWS CLI
       - name: Upload backup to R2
         run: |
           aws s3 cp ${{ steps.create_backup_file.outputs.filename }} s3://${{ secrets.R2_BUCKET_NAME }}/ --endpoint-url ${{ secrets.R2_ENDPOINT_URL }}
