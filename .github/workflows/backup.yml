@@ -12,22 +12,24 @@ jobs:
   backup:
     runs-on: ubuntu-latest
     steps:
-      # BƯỚC 1 (ĐÃ THAY ĐỔI): Cài đặt Turso CLI bằng cách tải trực tiếp
+      # BƯỚC 1 (ĐÃ SỬA LỖI): Cài đặt Turso CLI bằng cách tải trực tiếp và dùng jq
       - name: Install Turso CLI
         run: |
-          # Lấy URL phiên bản mới nhất từ GitHub API
-          LATEST_URL=$(curl -s "https://api.github.com/repos/tursodatabase/turso-cli/releases/latest" | grep "browser_download_url.*linux_amd64.tar.gz" | cut -d : -f 2,3 | tr -d \")
+          # Dùng jq để lấy URL một cách đáng tin cậy
+          LATEST_URL=$(curl -s "https://api.github.com/repos/tursodatabase/turso-cli/releases/latest" | jq -r '.assets[] | select(.name | endswith("linux_amd64.tar.gz")) | .browser_download_url')
+
+          # Kiểm tra lại xem URL có tồn tại không
+          if [ -z "$LATEST_URL" ]; then
+            echo "Error: Could not find a download URL for the latest Turso CLI release."
+            exit 1
+          fi
+
+          echo "Downloading from: $LATEST_URL"
+          curl -L -o turso.tar.gz "$LATEST_URL"
           
-          # Tải file về
-          curl -L -o turso.tar.gz $LATEST_URL
-          
-          # Giải nén
           tar -xzf turso.tar.gz
-          
-          # Di chuyển file thực thi vào thư mục hệ thống
           sudo mv ./turso /usr/local/bin/
           
-          # Kiểm tra phiên bản để xác nhận cài đặt thành công
           echo "Turso CLI installed successfully:"
           turso --version
 
@@ -50,8 +52,8 @@ jobs:
       # Bước 3: Cài đặt AWS CLI
       - name: Install AWS CLI
         run: |
-          sudo apt-get update
-          sudo apt-get install -y awscli
+          sudo apt-get -y update
+          sudo apt-get -y install awscli
 
       # Bước 4: Cấu hình thông tin truy cập Cloudflare R2
       - name: Configure AWS Credentials for R2
