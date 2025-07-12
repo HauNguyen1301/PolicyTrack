@@ -1,0 +1,41 @@
+name: Backup Turso Database
+
+on:
+  # Lên lịch chạy tự động vào 2:00 sáng (UTC) mỗi ngày
+  schedule:
+    - cron: '0 2 * * *'
+
+  # Cho phép chạy thủ công từ tab Actions trên GitHub
+  workflow_dispatch:
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      # Bước 1: Cài đặt Turso CLI
+      - name: Install Turso CLI
+        run: curl -sSfL https://get.tur.so/install.sh | bash
+
+      # Bước 2: Backup CSDL và nén lại
+      - name: Backup Database
+        run: |
+          export PATH="${HOME}/.turso/bin:${PATH}"
+          TIMESTAMP=$(date +"%Y-%m-%d_%H-%M")
+          FILENAME="backup-${TIMESTAMP}.sql.gz"
+
+          echo "Starting backup for policytrack..."
+          turso db shell policytrack .dump | gzip > ${FILENAME}
+          echo "Backup file created: ${FILENAME}"
+        env:
+          TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
+
+      # Bước 3: Tải file backup lên Cloudflare R2
+      - name: Upload backup to R2
+        uses: a7ul/s3-action@v1.2.1
+        with:
+          command: 'cp'
+          source: 'backup-*.sql.gz'
+          destination: 's3://${{ secrets.R2_BUCKET_NAME }}/'
+          aws_access_key_id: ${{ secrets.R2_ACCESS_KEY_ID }}
+          aws_secret_access_key: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          endpoint: ${{ secrets.R2_ENDPOINT_URL }}
